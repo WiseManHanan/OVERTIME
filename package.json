@@ -1,0 +1,23 @@
+{
+  "name": "overtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A web reconstruction of a 1982 dual-screen LCD handheld running an original arcade game. Vanilla TypeScript, Vite, Canvas 2D, zero runtime dependencies.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24.15"
+  }
+}

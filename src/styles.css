@@ -1,0 +1,89 @@
+/*
+ * Page chrome only. The console is the hero; the page around it needs almost
+ * nothing (doc §3.3). Palette tokens live here so both the shell CSS and the
+ * canvas renderer read from one source (doc §3.1).
+ */
+:root {
+  --shell: #d8d2c4;
+  --shell-shadow: #a9a292;
+  --lcd-bg: #9bae8c;
+  --segment: #2b2e27;
+  --ghost: rgba(43, 46, 39, 0.08);
+  --print-red: #c1443a;
+  --print-blue: #3e6c9b;
+  --print-yellow: #d9a441;
+
+  --page-bg: #cfcabc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2rem 1rem;
+  background: var(--page-bg);
+  font-family: "Oswald", "Archivo Narrow", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  /* Shell scales to viewport height on desktop, width on mobile (doc §3.3). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Phase 0 placeholder: a plain centered box so `vite dev` shows something. */
+#app:empty::before {
+  content: "WW-52";
+  display: grid;
+  place-items: center;
+  width: min(70vw, 40vh);
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  background: var(--shell);
+  box-shadow: inset 0 0 0 3px var(--shell-shadow);
+  color: var(--shell-shadow);
+  letter-spacing: 0.3em;
+  font-size: 0.9rem;
+}
+
+#page-links {
+  display: flex;
+  gap: 0.6ch;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--shell-shadow);
+}
+
+#page-links a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+
+#page-links a:hover,
+#page-links a:focus-visible {
+  color: var(--segment);
+}
+
+@media (min-width: 481px) {
+  #app:empty::before {
+    width: auto;
+    height: min(80vh, 640px);
+  }
+}
