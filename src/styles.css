@@ -192,6 +192,21 @@ body {
   transform: translateY(1px);
 }
 
+/* Title-state onboarding: LEFT/RIGHT blink until the first move (doc §9.3). */
+.pad.hint {
+  animation: hint-blink 0.9s steps(1, start) infinite;
+}
+@keyframes hint-blink {
+  50% {
+    background: var(--ink);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pad.hint {
+    animation: none;
+  }
+}
+
 .btn-a {
   width: 52px;
   height: 52px;

@@ -196,7 +196,7 @@ Both screens use discrete `(floor, slot)` addressing. Nothing exists between slo
 |---|---|
 | LEFT / RIGHT | Move one slot. Blocked by gaps and screen edges. |
 | UP | Climb a ladder if standing on a ladder slot. Release a bolt if standing on a bolt station. |
-| DOWN | Duck. Occupies the same slot but is immune to *high* hazards. Cannot move while ducked. |
+| DOWN | On a down-ladder slot, descend one floor. Otherwise duck: same slot, immune to *high* hazards, cannot move while ducked. (Ladders run both ways; you cannot duck while standing on a down-ladder slot.) |
 | A | Jump. Airborne for 2 ticks, traveling one slot in the current facing direction, immune to *low* hazards for both ticks. |
 
 ### 5.3 Collision

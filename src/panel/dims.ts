@@ -7,15 +7,15 @@
  * derived from them is not a "position" (invariant 4).
  */
 import type { Screen } from "./types";
+import { SLOT_COUNT } from "../sim/world";
 
 export const PANEL_W = 160;
 export const PANEL_H = 96;
 
-/** Discrete horizontal slots per floor (doc §5.1). */
-export const SLOTS = 10;
-
 const MARGIN_X = 9;
-export const SLOT_W = (PANEL_W - MARGIN_X * 2) / SLOTS;
+/** Slot pitch in panel space. Derived from the one grid-width constant in
+ *  world.ts, so the pixel grid and the pose atlas cannot drift apart. */
+export const SLOT_W = (PANEL_W - MARGIN_X * 2) / SLOT_COUNT;
 
 /** Centre x of a slot in panel space. */
 export function slotCenterX(slot: number): number {
