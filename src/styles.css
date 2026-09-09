@@ -1,7 +1,7 @@
 /*
- * Page chrome only. The console is the hero; the page around it needs almost
- * nothing (doc §3.3). Palette tokens live here so both the shell CSS and the
- * canvas renderer read from one source (doc §3.1).
+ * The page is one object on a plain background (doc §3.3). Palette tokens live
+ * here so the shell CSS and the canvas renderer (src/panel/colors.ts) read from
+ * one source (doc §3.1).
  */
 :root {
   --shell: #d8d2c4;
@@ -14,6 +14,10 @@
   --print-yellow: #d9a441;
 
   --page-bg: #cfcabc;
+  --ink: #2f342c;
+
+  --font-silk: "Oswald", "Archivo Narrow", "Roboto Condensed", -apple-system,
+    system-ui, sans-serif;
 }
 
 * {
@@ -33,34 +37,277 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem;
+  gap: 1.1rem;
   padding: 2rem 1rem;
   background: var(--page-bg);
-  font-family: "Oswald", "Archivo Narrow", system-ui, sans-serif;
+  font-family: var(--font-silk);
   -webkit-font-smoothing: antialiased;
 }
 
 #app {
-  /* Shell scales to viewport height on desktop, width on mobile (doc §3.3). */
   display: flex;
-  align-items: center;
   justify-content: center;
 }
 
-/* Phase 0 placeholder: a plain centered box so `vite dev` shows something. */
-#app:empty::before {
-  content: "WW-52";
-  display: grid;
-  place-items: center;
-  width: min(70vw, 40vh);
-  aspect-ratio: 3 / 4;
-  border-radius: 14px;
+/* ---- the clamshell ------------------------------------------------------- */
+
+.shell {
+  position: relative;
+  width: min(92vw, 420px);
+  padding: 18px 20px 24px;
   background: var(--shell);
-  box-shadow: inset 0 0 0 3px var(--shell-shadow);
-  color: var(--shell-shadow);
-  letter-spacing: 0.3em;
-  font-size: 0.9rem;
+  border-radius: 18px 18px 26px 26px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.16),
+    inset 0 0 0 2px var(--shell-shadow),
+    0 20px 44px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  user-select: none;
+  -webkit-user-select: none;
 }
+
+@media (min-height: 940px) {
+  .shell {
+    width: min(92vw, 460px);
+  }
+}
+
+.screens {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.bezel {
+  background: var(--shell-shadow);
+  border-radius: 10px;
+  padding: 7px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.42);
+}
+
+.lcd {
+  display: block;
+  width: 100%;
+  aspect-ratio: 160 / 96;
+  background: var(--lcd-bg);
+  border-radius: 3px;
+}
+
+.hinge {
+  height: 15px;
+  margin: 3px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: linear-gradient(
+    var(--shell-shadow),
+    var(--shell) 42%,
+    var(--shell) 58%,
+    var(--shell-shadow)
+  );
+}
+
+.hinge-label {
+  font: 600 6px/1 var(--font-silk);
+  letter-spacing: 0.34em;
+  color: var(--shell);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.22);
+}
+
+.status-strip {
+  align-self: center;
+  font: 600 8px/1 var(--font-silk);
+  letter-spacing: 0.26em;
+  color: #3a3f36;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 3px 12px;
+  border-radius: 10px;
+}
+
+/* ---- controls ---------------------------------------------------------- */
+
+.deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 0;
+}
+
+.dpad {
+  display: grid;
+  grid-template: repeat(3, 26px) / repeat(3, 26px);
+}
+
+.pad,
+.btn-a,
+.mode {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  border: 0;
+}
+
+.pad {
+  background: var(--shell-shadow);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.28),
+    0 2px 3px rgba(0, 0, 0, 0.32);
+}
+
+.pad-up {
+  grid-area: 1 / 2;
+  border-radius: 5px 5px 0 0;
+}
+.pad-left {
+  grid-area: 2 / 1;
+  border-radius: 5px 0 0 5px;
+}
+.pad-right {
+  grid-area: 2 / 3;
+  border-radius: 0 5px 5px 0;
+}
+.pad-down {
+  grid-area: 3 / 2;
+  border-radius: 0 0 5px 5px;
+}
+.pad-hub {
+  grid-area: 2 / 2;
+  background: var(--shell-shadow);
+}
+
+.pad:active {
+  background: #8d8676;
+  transform: translateY(1px);
+}
+
+.btn-a {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #d1584c, #a23b32);
+  color: #fdeee9;
+  font: 700 15px/1 var(--font-silk);
+  letter-spacing: 0.06em;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.4),
+    0 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+.btn-a:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.42);
+}
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.mode {
+  background: var(--shell-shadow);
+  color: #efe9db;
+  font: 600 6.5px/1 var(--font-silk);
+  letter-spacing: 0.2em;
+  padding: 4px 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.24);
+}
+
+.mode:active {
+  transform: translateY(1px);
+}
+
+.pad:focus-visible,
+.btn-a:focus-visible,
+.mode:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---- silkscreen + trim ----------------------------------------------------- */
+
+.silkscreen {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.silkscreen .mark {
+  font: 600 6px/1 var(--font-silk);
+  letter-spacing: 0.3em;
+  color: #4c5147;
+}
+.silkscreen .model {
+  font: 700 9px/1 var(--font-silk);
+  letter-spacing: 0.22em;
+  color: #3a3f36;
+}
+.silkscreen .wordmark {
+  font: 700 13px/1 var(--font-silk);
+  letter-spacing: 0.36em;
+  color: var(--ink);
+}
+
+.regulatory {
+  margin: 1px 8px 0;
+  font: 400 3px/1.4 var(--font-silk);
+  letter-spacing: 0.02em;
+  color: rgba(43, 46, 39, 0.34);
+  text-align: center;
+}
+
+.screw {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #d2ccbe, #8d8676);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+}
+.screw::after {
+  content: "";
+  position: absolute;
+  inset: 3px 1px;
+  background: rgba(0, 0, 0, 0.26);
+  border-radius: 1px;
+  transform: rotate(34deg);
+}
+.screw-tl {
+  top: 7px;
+  left: 7px;
+}
+.screw-tr {
+  top: 7px;
+  right: 7px;
+}
+.screw-bl {
+  bottom: 8px;
+  left: 7px;
+}
+.screw-br {
+  bottom: 8px;
+  right: 7px;
+}
+
+.speaker {
+  position: absolute;
+  left: 22px;
+  bottom: 40px;
+  width: 26px;
+  height: 20px;
+  opacity: 0.55;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.34) 0 1px, transparent 1.5px)
+    0 0 / 6px 6px;
+}
+
+/* ---- one quiet line of links (doc §3.3, §9.3) --------------------------- */
 
 #page-links {
   display: flex;
@@ -81,9 +328,22 @@ body {
   color: var(--segment);
 }
 
-@media (min-width: 481px) {
-  #app:empty::before {
-    width: auto;
-    height: min(80vh, 640px);
+/* ---- mobile: the shell fills the screen (doc §3.3) --------------------- */
+
+@media (max-width: 480px) {
+  body {
+    padding: 0;
+    gap: 0;
+    justify-content: flex-start;
+  }
+  .shell {
+    width: 100vw;
+    min-height: 100dvh;
+    border-radius: 0;
+    padding: 16px 16px 20px;
+    justify-content: space-between;
+  }
+  #page-links {
+    padding: 10px 0 16px;
   }
 }
