@@ -3,6 +3,18 @@
  * here so the shell CSS and the canvas renderer (src/panel/colors.ts) read from
  * one source (doc §3.1).
  */
+
+/* Shell silkscreen face (doc §3.2): a condensed grotesque, self-hosted woff2.
+   Oswald, SIL OFL 1.1 — see src/fonts/Oswald-OFL.txt. Latin subset, variable
+   weight axis; Vite hashes and rebases the URL at build. */
+@font-face {
+  font-family: "Oswald";
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: swap;
+  src: url("./fonts/oswald-latin-var.woff2") format("woff2");
+}
+
 :root {
   --shell: #d8d2c4;
   --shell-shadow: #a9a292;
@@ -16,8 +28,8 @@
   --page-bg: #cfcabc;
   --ink: #2f342c;
 
-  --font-silk: "Oswald", "Archivo Narrow", "Roboto Condensed", -apple-system,
-    system-ui, sans-serif;
+  --font-silk: "Oswald", "Arial Narrow", "Roboto Condensed", system-ui,
+    sans-serif;
 }
 
 * {
@@ -53,7 +65,9 @@ body {
 
 .shell {
   position: relative;
-  width: min(92vw, 420px);
+  /* Scales to viewport height on desktop (doc §3.3); vw and the px cap only
+     take over on short-wide or very large screens. */
+  width: min(92vw, 48vh, 520px);
   padding: 18px 20px 24px;
   background: var(--shell);
   border-radius: 18px 18px 26px 26px;
@@ -67,12 +81,6 @@ body {
   gap: 11px;
   user-select: none;
   -webkit-user-select: none;
-}
-
-@media (min-height: 940px) {
-  .shell {
-    width: min(92vw, 460px);
-  }
 }
 
 .screens {

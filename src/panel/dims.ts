@@ -11,9 +11,6 @@ import type { Screen } from "./types";
 export const PANEL_W = 160;
 export const PANEL_H = 96;
 
-/** Unlit segments are always drawn at this alpha (doc §3.1, `--ghost`). */
-export const GHOST_ALPHA = 0.08;
-
 /** Discrete horizontal slots per floor (doc §5.1). */
 export const SLOTS = 10;
 

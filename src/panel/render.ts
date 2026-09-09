@@ -12,7 +12,7 @@
  */
 import type { Screen } from "./types";
 import type { Palette } from "./colors";
-import { PANEL_W, PANEL_H, GHOST_ALPHA } from "./dims";
+import { PANEL_W, PANEL_H } from "./dims";
 import { atlasFor } from "./atlas";
 import { pathForSeg } from "./paths";
 import { drawBackdrop } from "./backdrop";
@@ -24,7 +24,7 @@ export interface PanelView {
   lit: ReadonlySet<string>;
   /** On-panel text regions (score, messages), each drawn ghost-then-lit. */
   texts: readonly TextSpec[];
-  /** Battery contrast modifier (doc §7.3). 1 = full; applied to the lit pass only. */
+  /** Battery contrast modifier (doc §7.3). 1 = full; applied to the lit segment pass only. */
   contrast: number;
   /** Power-on self-test: light every segment regardless of `lit` (doc §9.1). */
   selfTest?: boolean;
@@ -48,18 +48,22 @@ export function renderPanel(
   // 2 — the printed backdrop
   drawBackdrop(ctx, view.screen, pal);
 
-  // 3 — every segment in the atlas, ghosted
-  ctx.fillStyle = pal.segment;
-  ctx.globalAlpha = GHOST_ALPHA;
+  // 3 — every segment in the atlas, ghosted (--ghost carries its own alpha)
+  ctx.fillStyle = pal.ghost;
+  ctx.globalAlpha = 1;
   for (const seg of segs) ctx.fill(pathForSeg(seg));
   for (const spec of view.texts) drawTextLayer(ctx, spec, false);
 
-  // 4 + 5 — the lit subset, with the battery contrast modifier riding this pass
+  // 4 + 5 — the lit subset at --segment, with the battery contrast modifier
+  // riding this pass only (doc §4.3 step 5).
+  ctx.fillStyle = pal.segment;
   ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
   for (const seg of segs) {
     if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
   }
-  for (const spec of view.texts) drawTextLayer(ctx, spec, !selfTest);
 
+  // On-panel text (score, messages, Steward dialogue) is not an atlas segment;
+  // step 5 dims step 4 only, so the readout holds full contrast as battery falls.
   ctx.globalAlpha = 1;
+  for (const spec of view.texts) drawTextLayer(ctx, spec, !selfTest);
 }

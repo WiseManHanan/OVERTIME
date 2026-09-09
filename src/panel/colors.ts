@@ -7,6 +7,8 @@
 export interface Palette {
   lcdBg: string;
   segment: string;
+  /** Unlit segment colour, alpha baked in (doc §3.1, `--ghost`). Drawn at globalAlpha 1. */
+  ghost: string;
   printRed: string;
   printBlue: string;
   printYellow: string;
@@ -15,6 +17,7 @@ export interface Palette {
 const FALLBACK: Palette = {
   lcdBg: "#9BAE8C",
   segment: "#2B2E27",
+  ghost: "rgba(43, 46, 39, 0.08)",
   printRed: "#C1443A",
   printBlue: "#3E6C9B",
   printYellow: "#D9A441",
@@ -29,6 +32,7 @@ export function readPalette(root: Element = document.documentElement): Palette {
   return {
     lcdBg: prop("--lcd-bg", FALLBACK.lcdBg),
     segment: prop("--segment", FALLBACK.segment),
+    ghost: prop("--ghost", FALLBACK.ghost),
     printRed: prop("--print-red", FALLBACK.printRed),
     printBlue: prop("--print-blue", FALLBACK.printBlue),
     printYellow: prop("--print-yellow", FALLBACK.printYellow),
