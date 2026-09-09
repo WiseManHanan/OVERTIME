@@ -1,16 +1,22 @@
 /*
  * `GameState` and its initial-state factory.
  *
- * Everything the simulation needs lives here as plain data. The seed and (later)
- * the clock mode are resolved once, at run start, and stored — `step()` never
- * reaches for the wall clock or `Math.random()` (invariant 1). No field that
- * names a position is ever fractional (invariant 4).
+ * Everything the simulation needs lives here as plain data. The seed is resolved
+ * once, at run start, and stored — `step()` never reaches for the wall clock or
+ * `Math.random()` (invariant 1). No field that names a position is ever
+ * fractional (invariant 4).
  */
 import type { Floor } from "./world";
+import { BOLT_SLOTS } from "./world";
 import { seedRng, type RngState } from "./rng";
+import { roundParams } from "./rounds";
+import type { Hazard } from "./hazards";
 
 export type Facing = -1 | 1;
-export type PipPose = "stand" | "walk" | "climb" | "duck" | "jump";
+export type PipPose = "stand" | "walk" | "climb" | "duck" | "jump" | "release";
+
+/** The run's overall state machine. */
+export type RunPhase = "title" | "playing" | "cleared" | "over";
 
 export interface Pip {
   floor: Floor;
@@ -19,35 +25,78 @@ export interface Pip {
   /** Last horizontal direction pressed; the direction a jump travels. */
   facing: Facing;
   pose: PipPose;
-  /** Air-ticks left in the current jump arc, not counting this one. 0 = grounded. */
+  /** Ticks of jump arc remaining. `> 0` means airborne (immune to low hazards);
+   *  `0` means grounded. Stays in step with `isAirborne` / the "jump" pose. */
   airborne: number;
+  /** Ticks left in a bolt release. Pip is movement-locked while this is > 0. */
+  releasing: number;
+  /** Index into BOLT_SLOTS currently being released, or -1. */
+  releasingBolt: number;
 }
 
 export interface GameState {
   readonly seed: number;
   tick: number;
   rng: RngState;
-  /** False until Pip first changes slot or floor — the title state (doc §9.3). */
-  started: boolean;
+  phase: RunPhase;
+  /** 1-based. Drives the speed table (doc §6.1). */
+  round: number;
+  score: number;
+  misses: number;
   pip: Pip;
+  hazards: readonly Hazard[];
+  /** One flag per BOLT_SLOTS entry; all true clears the round. */
+  bolts: readonly boolean[];
+  /** Ticks until the next barrel spawns. */
+  spawnCountdown: number;
+  /** Ticks until Bruno's next swipe. */
+  swipeCountdown: number;
+  /** Ticks of swipe animation left (2 on the swing, then 1, 0). */
+  swipe: number;
+  /** Ticks left on the ROUND CLEAR screen before the next round begins. */
+  clearedCountdown: number;
 }
 
 export const START_FLOOR: Floor = 1;
 export const START_SLOT = 5;
+export const MISSES_ALLOWED = 3;
+export const BOLT_RELEASE_TICKS = 3;
+export const ROUND_CLEARED_TICKS = 18;
+export const BRUNO_SLOT = 6;
+/** Slots either side of Bruno his swipe reaches — 5,6,7, matching the drawn arc. */
+export const SWIPE_REACH = 1;
+export const POINTS_PER_BOLT = 100;
+export const POINTS_PER_ROUND_CLEAR = 500;
+
+export function freshPip(): Pip {
+  return {
+    floor: START_FLOOR,
+    slot: START_SLOT,
+    facing: 1,
+    pose: "stand",
+    airborne: 0,
+    releasing: 0,
+    releasingBolt: -1,
+  };
+}
 
 export function initialState(seed: number): GameState {
+  const first = roundParams(1);
   return {
     seed,
     tick: 0,
     rng: seedRng(seed),
-    started: false,
-    pip: {
-      floor: START_FLOOR,
-      slot: START_SLOT,
-      facing: 1,
-      pose: "stand",
-      airborne: 0,
-    },
+    phase: "title",
+    round: 1,
+    score: 0,
+    misses: 0,
+    pip: freshPip(),
+    hazards: [],
+    bolts: BOLT_SLOTS.map(() => false),
+    spawnCountdown: first.hazardCadence,
+    swipeCountdown: first.swipeCadence,
+    swipe: 0,
+    clearedCountdown: 0,
   };
 }
 

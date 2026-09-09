@@ -67,6 +67,14 @@ export function climbSlots(floor: Floor): readonly number[] {
   return out;
 }
 
+/** Bolt stations on floor 4 (doc §5.1). Releasing all four clears the round. */
+export const BOLT_SLOTS: readonly number[] = [1, 3, 5, 7];
+
+/** Index into `BOLT_SLOTS` for a slot on floor 4, or -1 if it is not a station. */
+export function boltIndexAt(slot: number): number {
+  return BOLT_SLOTS.indexOf(slot);
+}
+
 /**
  * Where a jump from `(floor, slot)` in direction `dir` lands, or `null` if it is
  * blocked (screen edge, or a gap too wide to clear from here).

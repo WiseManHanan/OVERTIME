@@ -9,16 +9,18 @@
  * he is about to take — is always on the glass.
  */
 import type { Screen, Seg, Shape } from "./types";
-import { slotCenterX, floorBaselineY } from "./dims";
+import { PANEL_W, slotCenterX, floorBaselineY } from "./dims";
 import {
+  BOLT_SLOTS,
   FLOORS,
   MAX_SLOT,
+  boltIndexAt,
   climbSlots,
   floorLocal,
   floorScreen,
   isStandable,
 } from "../sim/world";
-import type { PipPose } from "../sim/state";
+import { BRUNO_SLOT, type PipPose } from "../sim/state";
 
 const rect = (x: number, y: number, w: number, h: number): Shape => ({ k: "rect", x, y, w, h });
 const poly = (pts: [number, number][]): Shape => ({ k: "poly", pts });
@@ -117,13 +119,71 @@ function climbShapes(cx: number, b: number): Shape[] {
   ];
 }
 
+/** Crouched over the bolt, both arms down on the wrench — the release lock. */
+function releaseShapes(cx: number, b: number): Shape[] {
+  return [
+    hardHat(cx, b - 20),
+    head(cx, b - 15),
+    poly([[cx - 3.6, b - 11], [cx + 3.6, b - 11], [cx + 3, b - 5.5], [cx - 3, b - 5.5]]), // stooped torso
+    poly([[cx - 5.4, b - 10.5], [cx - 3.8, b - 11], [cx - 1.6, b - 6.5], [cx - 3.2, b - 5.8]]), // both arms
+    poly([[cx + 1.6, b - 6.5], [cx + 3.8, b - 11], [cx + 5.4, b - 10.5], [cx + 3.2, b - 5.8]]), // reaching down
+    rect(cx - 3.1, b - 5.2, 2.3, 3.4),
+    rect(cx + 0.8, b - 5.2, 2.3, 3.4),
+    poly([[cx - 4.2, b - 2], [cx - 0.6, b - 2], [cx - 0.6, b], [cx - 5, b]]),
+    poly([[cx + 0.6, b - 2], [cx + 4.2, b - 2], [cx + 5, b], [cx + 0.6, b]]),
+  ];
+}
+
 const POSE_SHAPES: Record<PipPose, (cx: number, b: number) => Shape[]> = {
   stand: standShapes,
   walk: walkShapes,
   duck: duckShapes,
   jump: jumpShapes,
   climb: climbShapes,
+  release: releaseShapes,
 };
+
+/** A rolling barrel: a low hazard, resting on the floor line (doc §5.4). */
+function barrelShapes(cx: number, b: number): Shape[] {
+  return [
+    { k: "circle", cx, cy: b - 2.7, r: 2.7 },
+    rect(cx - 2.3, b - 3.6, 4.6, 0.9),
+    rect(cx - 2.3, b - 1.9, 4.6, 0.9),
+  ];
+}
+
+/** Bruno the foreman, on his platform above floor 4. Idle = arms folded; swipe =
+ *  the arm thrown down in a low arc across bolt stations 5–7 — the slots the hit
+ *  test covers (doc §5.5). */
+function brunoShapes(swiping: boolean): Shape[] {
+  const cx = slotCenterX(BRUNO_SLOT);
+  const b = floorBaselineY("upper", 0) - 6; // his boots, above the floor-4 plate
+  const sweepY = floorBaselineY("upper", 0) - 3; // bolt-station height
+  const arms: Shape = swiping
+    ? poly([
+        [cx - 2, b - 16],
+        [cx + 2, b - 16],
+        [slotCenterX(7) + 1, sweepY - 2],
+        [slotCenterX(7) + 2, sweepY + 1],
+        [slotCenterX(5) - 2, sweepY + 1],
+        [slotCenterX(5) - 2, sweepY - 2],
+      ])
+    : rect(cx - 6.5, b - 13, 13, 2.6); // folded across the chest
+  return [
+    poly([[cx - 5, b - 22], [cx + 5, b - 22], [cx + 6.5, b - 18], [cx - 6.5, b - 18]]), // wide hard hat
+    rect(cx - 3.4, b - 17.5, 6.8, 5), // head
+    poly([[cx - 6, b - 12], [cx + 6, b - 12], [cx + 5, b - 3], [cx - 5, b - 3]]), // barrel chest
+    arms,
+    rect(cx - 4.4, b - 3, 3.6, 3),
+    rect(cx + 0.8, b - 3, 3.6, 3),
+  ];
+}
+
+/** The three miss pips across the top of the upper panel. */
+function missPipSeg(i: number): Seg {
+  const x = PANEL_W / 2 - 8 + i * 6;
+  return { id: `miss.p${i}`, screen: "upper", shapes: [{ k: "rect", x, y: 2, w: 4, h: 4 }] };
+}
 
 export function pipShapes(pose: PipPose, cx: number, baseY: number): Shape[] {
   return POSE_SHAPES[pose](cx, baseY);
@@ -143,7 +203,8 @@ export function boltStation(slot: number): Seg {
   };
 }
 
-/** Poses generated at every standable slot. Climb is added only at ladder slots. */
+/** Poses generated at every standable slot. Climb is added at ladder slots,
+ *  release at the floor-4 bolt stations. */
 const GRID_POSES: readonly PipPose[] = ["stand", "walk", "duck", "jump"];
 
 function build(): Seg[] {
@@ -157,14 +218,23 @@ function build(): Seg[] {
     for (let s = 0; s <= MAX_SLOT; s++) {
       if (!isStandable(floor, s)) continue;
       const cx = slotCenterX(s);
-      const poses = climbHere.has(s) ? [...GRID_POSES, "climb" as const] : GRID_POSES;
+
+      const poses: PipPose[] = [...GRID_POSES];
+      if (climbHere.has(s)) poses.push("climb");
+      if (floor === 4 && boltIndexAt(s) >= 0) poses.push("release");
       for (const pose of poses) {
         segs.push({ id: `pip.f${floor}.s${s}.${pose}`, screen, shapes: pipShapes(pose, cx, baseY) });
       }
+
+      // A barrel can roll through any standable slot on any floor.
+      segs.push({ id: `barrel.f${floor}.s${s}`, screen, shapes: barrelShapes(cx, baseY) });
     }
   }
 
-  for (const s of [1, 3, 5, 7]) segs.push(boltStation(s));
+  for (const slot of BOLT_SLOTS) segs.push(boltStation(slot));
+  segs.push({ id: "bruno.idle", screen: "upper", shapes: brunoShapes(false) });
+  segs.push({ id: "bruno.swipe", screen: "upper", shapes: brunoShapes(true) });
+  for (let i = 0; i < 3; i++) segs.push(missPipSeg(i));
   return segs;
 }
 

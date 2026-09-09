@@ -107,7 +107,7 @@ This section is the heart of the project. Get it right and everything else reads
 ### 4.1 The tick
 
 ```ts
-const BASE_TICK_MS = 140;          // ~7.1 logical updates per second
+const BASE_TICK_MS = 170;          // ~5.9 logical updates per second
 tickMs = BASE_TICK_MS / speedMultiplier;
 ```
 
@@ -163,7 +163,7 @@ If a viewer can see the ghost of the pose Pip is about to be in, the effect is w
 
 Cross-pad (4 directions) plus one **A** button, plus **GAME A / GAME B / TIME** mode buttons on the shell. That is the entire hardware. Any mechanic requiring a fifth input is out of scope.
 
-Input is captured to a one-slot buffer and consumed at the next tick boundary. This produces a natural sub-140ms response lag which is *correct* — the real hardware had it, and removing it makes the game feel like a modern platformer wearing a costume.
+Input is captured to a one-slot buffer and consumed at the next tick boundary. This produces a natural sub-tick response lag which is *correct* — the real hardware had it, and removing it makes the game feel like a modern platformer wearing a costume.
 
 Keyboard: arrows or WASD, Space or Z for A, keys 1/2/3 for the mode buttons. Touch: the drawn shell buttons are the hit targets, with `touch-action: none` and pointer events.
 

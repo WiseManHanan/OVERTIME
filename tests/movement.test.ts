@@ -1,23 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { initialState } from "../src/sim/state";
+import { initialState, type GameState } from "../src/sim/state";
 import { step, type InputAction } from "../src/sim/step";
 
 type Act = InputAction | null;
 
-const run = (acts: Act[], seed = 1) =>
-  acts.reduce((s, a) => step(s, a), initialState(seed));
+// Movement in isolation: pin the spawn/swipe countdowns so no barrel or swipe
+// ever interferes with a pure-motion assertion.
+const quiet = (s: GameState): GameState => ({
+  ...s,
+  spawnCountdown: 1e9,
+  swipeCountdown: 1e9,
+});
+const mstep = (s: GameState, a: Act): GameState => step(quiet(s), a);
+const run = (acts: Act[], seed = 1): GameState =>
+  acts.reduce((s, a) => mstep(s, a), initialState(seed));
 
-describe("movement — Phase 2 checkpoint", () => {
+describe("movement", () => {
   it("starts on floor 1, in the title state", () => {
     const s = initialState(1);
     expect(s.pip.floor).toBe(1);
     expect(s.pip.slot).toBe(5);
-    expect(s.started).toBe(false);
+    expect(s.phase).toBe("title");
   });
 
   it("the first directional input starts the run and moves Pip", () => {
     const s = run(["right"]);
-    expect(s.started).toBe(true);
+    expect(s.phase).toBe("playing");
     expect(s.pip.slot).toBe(6);
     expect(s.pip.pose).toBe("walk");
   });
@@ -37,39 +45,36 @@ describe("movement — Phase 2 checkpoint", () => {
 
   it("blocks at both screen edges", () => {
     let s = initialState(1);
-    for (let i = 0; i < 12; i++) s = step(s, "left");
+    for (let i = 0; i < 12; i++) s = mstep(s, "left");
     expect(s.pip.slot).toBe(0);
-    for (let i = 0; i < 20; i++) s = step(s, "right");
+    for (let i = 0; i < 20; i++) s = mstep(s, "right");
     expect(s.pip.slot).toBe(9);
   });
 
   it("traverses all four floors across both screens, no fractional motion", () => {
     let s = initialState(1);
 
-    // floor 1: ladder up at slot 9
-    for (let i = 0; i < 9; i++) s = step(s, "right");
+    for (let i = 0; i < 9; i++) s = mstep(s, "right");
     expect(s.pip).toMatchObject({ floor: 1, slot: 9 });
-    s = step(s, "up");
+    s = mstep(s, "up");
     expect(s.pip.floor).toBe(2);
 
-    // floor 2: gap at slots 4–5, ladder up at slot 0
-    for (let i = 0; i < 3; i++) s = step(s, "left"); // 9 -> 6
+    for (let i = 0; i < 3; i++) s = mstep(s, "left"); // 9 -> 6
     expect(s.pip.slot).toBe(6);
-    s = step(s, "left"); // into the gap: blocked
+    s = mstep(s, "left"); // into the gap: blocked
     expect(s.pip.slot).toBe(6);
-    s = step(s, "a"); // jump the gap, facing left -> land slot 3
+    s = mstep(s, "a"); // jump the gap, facing left -> land slot 3
     expect(s.pip.slot).toBe(3);
-    s = step(s, null); // drain the arc
-    s = step(s, null);
+    s = mstep(s, null);
+    s = mstep(s, null);
     expect(s.pip.pose).toBe("stand");
-    for (let i = 0; i < 3; i++) s = step(s, "left"); // 3 -> 0
+    for (let i = 0; i < 3; i++) s = mstep(s, "left"); // 3 -> 0
     expect(s.pip.slot).toBe(0);
-    s = step(s, "up");
+    s = mstep(s, "up");
     expect(s.pip.floor).toBe(3);
 
-    // floor 3: ladder up at slot 9
-    for (let i = 0; i < 9; i++) s = step(s, "right");
-    s = step(s, "up");
+    for (let i = 0; i < 9; i++) s = mstep(s, "right");
+    s = mstep(s, "up");
     expect(s.pip.floor).toBe(4);
     expect(Number.isInteger(s.pip.slot)).toBe(true);
   });
@@ -80,26 +85,23 @@ describe("movement — Phase 2 checkpoint", () => {
   });
 
   it("a no-op key press does not leave the title state (doc §9.3)", () => {
-    // UP with no ladder here, and DOWN as a plain duck, move Pip nowhere — so
-    // the title and the LEFT/RIGHT hint must stay up.
-    expect(run(["up"]).started).toBe(false);
-    expect(run(["down"]).started).toBe(false);
+    expect(run(["up"]).phase).toBe("title");
+    expect(run(["down"]).phase).toBe("title");
     expect(run(["down"]).pip.pose).toBe("duck");
   });
 
   it("the first real move clears the title", () => {
-    expect(run(["right"]).started).toBe(true);
-    expect(run(["left"]).started).toBe(true);
-    // a jump that lands on a new slot counts as a move
-    expect(run(["a"]).started).toBe(true);
+    expect(run(["right"]).phase).toBe("playing");
+    expect(run(["left"]).phase).toBe("playing");
+    expect(run(["a"]).phase).toBe("playing"); // a jump that lands elsewhere is a move
   });
 
   it("descends a ladder with DOWN on a down-ladder slot", () => {
     let s = initialState(1);
-    for (let i = 0; i < 9; i++) s = step(s, "right"); // floor 1 -> slot 9
-    s = step(s, "up");
+    for (let i = 0; i < 9; i++) s = mstep(s, "right"); // floor 1 -> slot 9
+    s = mstep(s, "up");
     expect(s.pip.floor).toBe(2);
-    s = step(s, "down"); // slot 9 is floor 2's down-ladder
+    s = mstep(s, "down"); // slot 9 is floor 2's down-ladder
     expect(s.pip).toMatchObject({ floor: 1, slot: 9, pose: "climb" });
   });
 
@@ -109,67 +111,75 @@ describe("movement — Phase 2 checkpoint", () => {
     expect(s.pip.floor).toBe(1);
   });
 
-  it("round-trips floor 1 -> 4 -> 1", () => {
-    let s = initialState(1);
-    // up
-    for (let i = 0; i < 9; i++) s = step(s, "right");
-    s = step(s, "up"); // floor 2, slot 9
-    for (let i = 0; i < 3; i++) s = step(s, "left"); // -> slot 6
-    s = step(s, "a"); // jump the gap facing left -> slot 3
-    s = step(s, null);
-    s = step(s, null);
-    for (let i = 0; i < 3; i++) s = step(s, "left"); // -> slot 0
-    s = step(s, "up"); // floor 3
-    for (let i = 0; i < 9; i++) s = step(s, "right");
-    s = step(s, "up"); // floor 4, slot 9
-    expect(s.pip.floor).toBe(4);
-    // down
-    s = step(s, "down"); // floor 3, slot 9
-    expect(s.pip.floor).toBe(3);
-    for (let i = 0; i < 9; i++) s = step(s, "left"); // -> slot 0
-    s = step(s, "down"); // floor 2, slot 0
-    expect(s.pip.floor).toBe(2);
-    for (let i = 0; i < 3; i++) s = step(s, "right"); // -> slot 3
-    s = step(s, "a"); // jump the gap facing right -> slot 6
-    expect(s.pip.slot).toBe(6);
-    s = step(s, null);
-    s = step(s, null);
-    for (let i = 0; i < 3; i++) s = step(s, "right"); // -> slot 9
-    s = step(s, "down"); // floor 1
-    expect(s.pip).toMatchObject({ floor: 1, slot: 9 });
+  it("a duck lasts a single tick", () => {
+    let s = run(["right"]); // playing, slot 6
+    s = mstep(s, "down");
+    expect(s.pip.pose).toBe("duck");
+    s = mstep(s, null);
+    expect(s.pip.pose).toBe("stand");
   });
 
-  it("a jump is airborne for two ticks, then grounded", () => {
-    let s = run(["right"]); // slot 6, facing right, started
-    s = step(s, "a");
-    expect(s.pip.pose).toBe("jump");
-    expect(s.pip.slot).toBe(7); // ordinary hop, resolved at takeoff
-    s = step(s, null);
-    expect(s.pip.pose).toBe("jump"); // arc tick
-    s = step(s, null);
-    expect(s.pip.pose).toBe("stand"); // landed
-    expect(s.pip.airborne).toBe(0);
+  it("a jump is airborne for two ticks, then acts on landing", () => {
+    let s = run(["right"]); // slot 6, facing right
+    s = mstep(s, "a");
+    expect(s.pip).toMatchObject({ slot: 7, pose: "jump" });
+    expect(s.pip.airborne).toBeGreaterThan(0);
+    s = mstep(s, null);
+    expect(s.pip.pose).toBe("jump"); // second airborne tick
+    s = mstep(s, "left"); // lands and the input applies the same tick
+    expect(s.pip).toMatchObject({ slot: 6, pose: "walk", airborne: 0 });
   });
 
-  it("cannot act mid-arc", () => {
+  it("cannot move mid-arc", () => {
     let s = run(["right"]); // slot 6
-    s = step(s, "a"); // -> slot 7, airborne
-    s = step(s, "right"); // ignored
+    s = mstep(s, "a"); // -> slot 7
+    s = mstep(s, "right"); // locked
     expect(s.pip.slot).toBe(7);
   });
 
   it("a blocked jump goes straight up", () => {
     let s = initialState(1);
-    for (let i = 0; i < 9; i++) s = step(s, "right"); // slot 9, facing right
-    s = step(s, "a"); // nothing to the right
-    expect(s.pip.slot).toBe(9);
-    expect(s.pip.pose).toBe("jump");
+    for (let i = 0; i < 9; i++) s = mstep(s, "right"); // slot 9, facing right
+    s = mstep(s, "a");
+    expect(s.pip).toMatchObject({ slot: 9, pose: "jump" });
   });
 
-  it("duck lasts a single tick and locks movement", () => {
-    let s = run(["down"]);
-    expect(s.pip.pose).toBe("duck");
-    s = step(s, null);
-    expect(s.pip.pose).toBe("stand");
+  it("airborne agrees with the jump pose every tick of the arc", () => {
+    let s = run(["right"]);
+    s = mstep(s, "a");
+    expect(s.pip.airborne > 0).toBe(s.pip.pose === "jump");
+    s = mstep(s, null);
+    expect(s.pip.airborne > 0).toBe(s.pip.pose === "jump");
+    s = mstep(s, null);
+    expect(s.pip.airborne > 0).toBe(s.pip.pose === "jump");
+  });
+
+  it("round-trips floor 1 -> 4 -> 1", () => {
+    let s = initialState(1);
+    for (let i = 0; i < 9; i++) s = mstep(s, "right");
+    s = mstep(s, "up"); // floor 2, slot 9
+    for (let i = 0; i < 3; i++) s = mstep(s, "left"); // -> slot 6
+    s = mstep(s, "a"); // jump the gap facing left -> slot 3
+    s = mstep(s, null);
+    s = mstep(s, null);
+    for (let i = 0; i < 3; i++) s = mstep(s, "left"); // -> slot 0
+    s = mstep(s, "up"); // floor 3
+    for (let i = 0; i < 9; i++) s = mstep(s, "right");
+    s = mstep(s, "up"); // floor 4, slot 9
+    expect(s.pip.floor).toBe(4);
+
+    s = mstep(s, "down"); // floor 3, slot 9
+    expect(s.pip.floor).toBe(3);
+    for (let i = 0; i < 9; i++) s = mstep(s, "left"); // -> slot 0
+    s = mstep(s, "down"); // floor 2, slot 0
+    expect(s.pip.floor).toBe(2);
+    for (let i = 0; i < 3; i++) s = mstep(s, "right"); // -> slot 3
+    s = mstep(s, "a"); // jump the gap facing right -> slot 6
+    expect(s.pip.slot).toBe(6);
+    s = mstep(s, null);
+    s = mstep(s, null);
+    for (let i = 0; i < 3; i++) s = mstep(s, "right"); // -> slot 9
+    s = mstep(s, "down"); // floor 1
+    expect(s.pip).toMatchObject({ floor: 1, slot: 9 });
   });
 });

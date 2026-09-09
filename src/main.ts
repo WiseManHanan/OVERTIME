@@ -14,9 +14,12 @@ import { renderPanel, type PanelView } from "./panel/render";
 import { sceneFor } from "./panel/scene";
 import { initialState } from "./sim/state";
 import { step } from "./sim/step";
+import { roundParams } from "./sim/rounds";
 import type { Screen } from "./panel/types";
 
-const BASE_TICK_MS = 140; // doc §4.1; Phase 2 has no speed table, multiplier = 1
+// Base tick at round-1 speed (~5.9 logical updates/sec). The round speed table
+// (doc §6.1) divides this; nothing else sets the pace.
+const BASE_TICK_MS = 170;
 const BOOT_MS = 300;
 const MAX_DPR = 3;
 const MAX_CATCHUP_TICKS = 8; // don't replay a backgrounded tab's worth of ticks
@@ -30,13 +33,14 @@ const input = createInput(shell);
 
 let state = initialState(Date.now() >>> 0);
 
-// Blink the cross-pad's LEFT/RIGHT until the first move (doc §9.3).
-shell.dpad.left.classList.add("hint");
-shell.dpad.right.classList.add("hint");
-function clearHints(): void {
-  shell.dpad.left.classList.remove("hint");
-  shell.dpad.right.classList.remove("hint");
+// Blink the cross-pad's LEFT/RIGHT in the title state (doc §9.3). Driven by the
+// phase, so it comes back on a restart after GAME OVER.
+function syncHints(): void {
+  const inTitle = state.phase === "title";
+  shell.dpad.left.classList.toggle("hint", inTitle);
+  shell.dpad.right.classList.toggle("hint", inTitle);
 }
+syncHints();
 
 // Canvas size only changes on resize, so the layout read and the transform are
 // done in `measureAll()` — at startup and on resize — never in the render path.
@@ -94,16 +98,24 @@ function startLoop(): void {
   const frame = (now: number): void => {
     acc += now - last;
     last = now;
-    if (acc > BASE_TICK_MS * MAX_CATCHUP_TICKS) acc = BASE_TICK_MS * MAX_CATCHUP_TICKS;
+
+    // The round speed table scales the tick rate, not the sim (doc §6.1).
+    const tickMs = BASE_TICK_MS / roundParams(state.round).speed;
+    if (acc > tickMs * MAX_CATCHUP_TICKS) acc = tickMs * MAX_CATCHUP_TICKS;
 
     let dirty = false;
-    while (acc >= BASE_TICK_MS) {
-      acc -= BASE_TICK_MS;
-      state = step(state, input.drain());
+    while (acc >= tickMs) {
+      acc -= tickMs;
+      const action = input.drain();
+      if (state.phase === "over" && action === "a") {
+        state = initialState(Date.now() >>> 0); // a fresh seeded run
+      } else {
+        state = step(state, action);
+      }
       dirty = true;
     }
     if (dirty) {
-      if (state.started) clearHints();
+      syncHints();
       paint();
     }
     requestAnimationFrame(frame);
