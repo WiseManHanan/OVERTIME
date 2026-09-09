@@ -185,6 +185,47 @@ function missPipSeg(i: number): Seg {
   return { id: `miss.p${i}`, screen: "upper", shapes: [{ k: "rect", x, y: 2, w: 4, h: 4 }] };
 }
 
+/** The boredom meter (doc §6.2): ten pips along the top-left of the lower panel,
+ *  a lit prefix showing how bored the Steward is. */
+function boredomPipSeg(i: number): Seg {
+  return { id: `boredom.p${i}`, screen: "lower", shapes: [rect(6 + i * 3.2, 3, 2, 3)] };
+}
+
+/** The Steward, in the lower panel's left margin, outside the play grid (doc
+ *  §5.1). His whole job is to react to the boredom meter: `bell` rings it
+ *  approvingly, `watch` checks the time, `asleep` is out cold (doc §6.2). */
+function stewardShapes(mood: "idle" | "bell" | "watch" | "asleep"): Shape[] {
+  const cx = 7;
+  const b = floorBaselineY("lower", 1); // floor-1 baseline
+  if (mood === "asleep") {
+    return [
+      rect(cx - 1, b - 12, 4, 3.2), // head, tipped forward
+      poly([[cx - 3, b - 9], [cx + 3.4, b - 9.6], [cx + 3, b - 2], [cx - 2.6, b - 2]]), // slumped coat
+      rect(cx - 2.4, b - 2, 5, 2), // sat down
+      poly([[cx + 3, b - 15], [cx + 5, b - 15.6], [cx + 5, b - 14], [cx + 3, b - 13.4]]), // a "Z" tick above
+    ];
+  }
+  const base: Shape[] = [
+    rect(cx - 2, b - 16, 4, 3.5), // head
+    poly([[cx - 3, b - 12], [cx + 3, b - 12], [cx + 2.4, b - 3], [cx - 2.4, b - 3]]), // long coat
+    rect(cx - 2.4, b - 3, 2, 3), // legs
+    rect(cx + 0.4, b - 3, 2, 3),
+  ];
+  if (mood === "bell") {
+    base.push(
+      poly([[cx + 2.4, b - 11], [cx + 4, b - 12], [cx + 5.6, b - 15], [cx + 4.4, b - 16]]), // raised arm
+      { k: "circle", cx: cx + 6, cy: b - 16.4, r: 1.9 }, // the bell
+    );
+  } else if (mood === "watch") {
+    base.push(
+      poly([[cx + 2.4, b - 11], [cx + 3.4, b - 8.6], [cx + 1.4, b - 7], [cx + 0.6, b - 9]]), // arm bent to the wrist
+    );
+  } else {
+    base.push(rect(cx + 2, b - 11, 1.6, 7)); // arm at his side
+  }
+  return base;
+}
+
 export function pipShapes(pose: PipPose, cx: number, baseY: number): Shape[] {
   return POSE_SHAPES[pose](cx, baseY);
 }
@@ -235,6 +276,11 @@ function build(): Seg[] {
   segs.push({ id: "bruno.idle", screen: "upper", shapes: brunoShapes(false) });
   segs.push({ id: "bruno.swipe", screen: "upper", shapes: brunoShapes(true) });
   for (let i = 0; i < 3; i++) segs.push(missPipSeg(i));
+
+  for (let i = 0; i < 10; i++) segs.push(boredomPipSeg(i));
+  for (const mood of ["idle", "bell", "watch", "asleep"] as const) {
+    segs.push({ id: `steward.${mood}`, screen: "lower", shapes: stewardShapes(mood) });
+  }
   return segs;
 }
 

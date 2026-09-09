@@ -34,6 +34,14 @@ import {
 import { advanceHazard, spawnBarrel, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
+import {
+  BOREDOM_START,
+  BOREDOM_STALE_FLOOR_TICKS,
+  NEAR_MISS_POINTS,
+  awardPoints,
+  nextAsleep,
+  nextBoredom,
+} from "./scoring";
 
 export type InputAction = "left" | "right" | "up" | "down" | "a";
 
@@ -49,7 +57,9 @@ export function step(state: GameState, input: InputAction | null): GameState {
     case "cleared":
       return stepCleared(state);
     case "over":
-      return { ...state, tick: state.tick + 1 };
+      // A trap state, but the swing that ended the run still needs to fall (the
+      // GAME OVER screen shows the upper panel — a frozen Bruno reads as a bug).
+      return { ...state, tick: state.tick + 1, swipe: Math.max(0, state.swipe - 1) };
   }
 }
 
@@ -173,7 +183,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
-  let score = state.score;
+  // Points accrue raw this tick and are scaled once, at the end, by the boredom
+  // multiplier (doc §6.2) — so "no points while the Steward sleeps" is exact.
+  let rawPoints = 0;
 
   // 1 — Pip
   const outcome = movePip(state.pip, input, state.bolts);
@@ -181,7 +193,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   let bolts = state.bolts;
   if (outcome.releasedBolt >= 0) {
     bolts = bolts.map((b, i) => (i === outcome.releasedBolt ? true : b));
-    score += POINTS_PER_BOLT;
+    rawPoints += POINTS_PER_BOLT;
   }
 
   // 2 — existing hazards roll (keep each one's start cell for the crossing check)
@@ -238,6 +250,20 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     else survivors.push(h);
   }
 
+  // 4b — near misses (doc §5.3): a survivor that rolled onto the slot Pip just
+  //      vacated, or one that passed beneath him mid-jump. This is where the
+  //      points are — the game's answer to the original's reward-for-patience.
+  const pipMoved = pip.slot !== pipFrom.slot || pip.floor !== pipFrom.floor;
+  let nearMisses = 0;
+  for (const h of survivors) {
+    const vacated =
+      pipMoved && h.floor === pipFrom.floor && h.slot === pipFrom.slot;
+    const beneath =
+      isAirborne(pip) && h.floor === pip.floor && h.slot === pip.slot;
+    if (vacated || beneath) nearMisses += 1;
+  }
+  rawPoints += nearMisses * NEAR_MISS_POINTS;
+
   // 5 — spawn: the new barrel appears now but is checked only from next tick, so
   //     every hazard gets at least one tick of telegraph (doc §5.4).
   let spawnCountdown = state.spawnCountdown - 1;
@@ -248,7 +274,30 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     spawnCountdown = params.hazardCadence;
   }
 
-  // 6 — resolve the round
+  // 6 — the boredom meter (doc §6.2). It fills while Pip is passive and drains
+  //     on the plays that read as skilled; nothing here touches the wall clock.
+  let ticksSinceFloorChange = state.ticksSinceFloorChange + 1;
+  const floorChanged = pip.floor !== pipFrom.floor;
+  if (floorChanged) ticksSinceFloorChange = 0;
+  const engaged =
+    floorChanged ||
+    pipMoved ||
+    pip.releasing > 0 ||
+    outcome.releasedBolt >= 0 ||
+    pip.pose === "jump" ||
+    pip.pose === "duck" ||
+    nearMisses > 0;
+  const boredom = nextBoredom(state.boredom, {
+    engaged,
+    floorChanged,
+    underThreat: survivors.some((h) => h.floor === pip.floor),
+    staleFloor: ticksSinceFloorChange > BOREDOM_STALE_FLOOR_TICKS,
+    nearMisses,
+    boltReleased: outcome.releasedBolt >= 0,
+  });
+  const stewardAsleep = nextAsleep(state.stewardAsleep, boredom);
+
+  // 7 — resolve the round
   misses = Math.min(misses, MISSES_ALLOWED); // two hits in one tick still ends at 3
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
@@ -257,8 +306,10 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   } else if (bolts.every((b) => b)) {
     phase = "cleared";
     clearedCountdown = ROUND_CLEARED_TICKS;
-    score += POINTS_PER_ROUND_CLEAR;
+    rawPoints += POINTS_PER_ROUND_CLEAR;
   }
+
+  const score = state.score + awardPoints(rawPoints, boredom, stewardAsleep);
 
   return {
     ...state,
@@ -274,13 +325,23 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipeCountdown,
     swipe,
     clearedCountdown,
+    boredom,
+    stewardAsleep,
+    nearMisses: state.nearMisses + nearMisses,
+    ticksSinceFloorChange,
   };
 }
 
 function stepCleared(state: GameState): GameState {
   const n = state.clearedCountdown - 1;
   if (n > 0) {
-    return { ...state, tick: state.tick + 1, clearedCountdown: n };
+    // Let a mid-swing Bruno settle during the countdown, as stepPlaying would.
+    return {
+      ...state,
+      tick: state.tick + 1,
+      clearedCountdown: n,
+      swipe: Math.max(0, state.swipe - 1),
+    };
   }
   const round = state.round + 1;
   const params = roundParams(round);
@@ -296,5 +357,8 @@ function stepCleared(state: GameState): GameState {
     swipeCountdown: params.swipeCadence,
     swipe: 0,
     clearedCountdown: 0,
+    boredom: BOREDOM_START, // a fresh round starts back in the neutral band
+    stewardAsleep: false,
+    ticksSinceFloorChange: 0,
   };
 }

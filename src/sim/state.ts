@@ -10,6 +10,7 @@ import type { Floor } from "./world";
 import { BOLT_SLOTS } from "./world";
 import { seedRng, type RngState } from "./rng";
 import { roundParams } from "./rounds";
+import { BOREDOM_START } from "./scoring";
 import type { Hazard } from "./hazards";
 
 export type Facing = -1 | 1;
@@ -55,6 +56,14 @@ export interface GameState {
   swipe: number;
   /** Ticks left on the ROUND CLEAR screen before the next round begins. */
   clearedCountdown: number;
+  /** Boredom meter, 0..BOREDOM_MAX (doc §6.2). Scales every point awarded. */
+  boredom: number;
+  /** Latched at a full meter, released below BOREDOM_WAKE — no points while true. */
+  stewardAsleep: boolean;
+  /** Near misses this run — the primary score driver, shown in the share string. */
+  nearMisses: number;
+  /** Ticks since Pip last changed floor; feeds the boredom meter. */
+  ticksSinceFloorChange: number;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -97,6 +106,10 @@ export function initialState(seed: number): GameState {
     swipeCountdown: first.swipeCadence,
     swipe: 0,
     clearedCountdown: 0,
+    boredom: BOREDOM_START,
+    stewardAsleep: false,
+    nearMisses: 0,
+    ticksSinceFloorChange: 0,
   };
 }
 

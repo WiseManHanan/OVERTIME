@@ -12,9 +12,12 @@ import { readPalette } from "./panel/colors";
 import { PANEL_W, PANEL_H } from "./panel/dims";
 import { renderPanel, type PanelView } from "./panel/render";
 import { sceneFor } from "./panel/scene";
-import { initialState } from "./sim/state";
+import { initialState, type GameState } from "./sim/state";
 import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
+import { stewardMood } from "./sim/scoring";
+import { createBeeper, type Cue } from "./audio/beeper";
+import { loadMute, saveMute } from "./store/persist";
 import type { Screen } from "./panel/types";
 
 // Base tick at round-1 speed (~5.9 logical updates/sec). The round speed table
@@ -30,6 +33,64 @@ if (mount === null) throw new Error("#app mount point missing from index.html");
 const shell = buildShell(mount);
 const pal = readPalette();
 const input = createInput(shell);
+
+// Audio (doc §4.5). The simulation stays silent; sound is main.ts diffing one
+// GameState against the next and firing the matching cue on the single voice.
+const beeper = createBeeper(loadMute());
+shell.root.classList.toggle("muted", beeper.muted);
+
+// WebAudio must be unlocked by a user gesture; the first key or pointer does it.
+const unlock = (): void => beeper.resume();
+window.addEventListener("keydown", unlock, { once: true });
+window.addEventListener("pointerdown", unlock, { once: true });
+
+// Mute toggle, persisted to localStorage (doc §4.5). M, or the speaker grille.
+function toggleMute(): void {
+  const next = !beeper.muted;
+  beeper.setMuted(next);
+  saveMute(next);
+  shell.root.classList.toggle("muted", next);
+}
+window.addEventListener("keydown", (e) => {
+  if (e.code === "KeyM") toggleMute();
+});
+shell.root.querySelector(".speaker")?.addEventListener("pointerdown", toggleMute);
+
+// Cues worth hearing, most urgent first — the monophonic voice plays one a tick.
+const CUE_PRIORITY: readonly Cue[] = [
+  "miss",
+  "roundClear",
+  "bolt",
+  "nearMiss",
+  "bell",
+  "jump",
+  "step",
+];
+
+function cuesBetween(prev: GameState, next: GameState): Set<Cue> {
+  const c = new Set<Cue>();
+  if (next.pip.pose === "jump" && prev.pip.pose !== "jump") c.add("jump");
+  else if (next.pip.pose === "walk" && next.pip.slot !== prev.pip.slot) c.add("step");
+  if (next.nearMisses > prev.nearMisses) c.add("nearMiss");
+  if (next.misses > prev.misses) c.add("miss");
+  if (next.bolts.some((b, i) => b && prev.bolts[i] !== true)) c.add("bolt");
+  if (next.phase === "cleared" && prev.phase !== "cleared") c.add("roundClear");
+  const mood = (s: GameState): string => stewardMood(s.boredom, s.stewardAsleep);
+  if (mood(next) === "bell" && mood(prev) !== "bell") c.add("bell");
+  return c;
+}
+
+// The monophonic voice plays one cue per rendered frame — the most urgent thing
+// that happened across however many ticks the frame advanced. A refocused tab
+// catching up eight ticks still gets a single beep, not a burst.
+function playFirst(cues: ReadonlySet<Cue>): void {
+  for (const cue of CUE_PRIORITY) {
+    if (cues.has(cue)) {
+      beeper.play(cue);
+      return;
+    }
+  }
+}
 
 let state = initialState(Date.now() >>> 0);
 
@@ -104,17 +165,21 @@ function startLoop(): void {
     if (acc > tickMs * MAX_CATCHUP_TICKS) acc = tickMs * MAX_CATCHUP_TICKS;
 
     let dirty = false;
+    const cues = new Set<Cue>();
     while (acc >= tickMs) {
       acc -= tickMs;
       const action = input.drain();
+      const prev = state;
       if (state.phase === "over" && action === "a") {
         state = initialState(Date.now() >>> 0); // a fresh seeded run
       } else {
         state = step(state, action);
+        for (const c of cuesBetween(prev, state)) cues.add(c);
       }
       dirty = true;
     }
     if (dirty) {
+      playFirst(cues);
       syncHints();
       paint();
     }

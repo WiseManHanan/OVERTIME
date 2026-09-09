@@ -272,6 +272,14 @@ The Steward tracks risk. The meter fills while Pip idles, stands in a slot no ha
 
 This is the single most important anti-camping mechanic and it must be tuned before anything else feels right.
 
+Phase 4 tuned values (`src/sim/scoring.ts`), 0–100 scale, starting at 50 each
+round: idle-and-safe fill +4/tick, idle-under-threat +2, stale-floor (past 20
+ticks) +2; drains are −28 per near miss, −20 per floor change, −15 per bolt
+release. A near miss pays 50 before the multiplier. Result: ~13 idle ticks
+(~2 seconds) takes a fresh round from 50 to asleep; one near miss buys back
+roughly a floor change and pushes the multiplier to ×1.5. The asleep state is a
+latch — it only releases once the meter is back below 66.
+
 ### 6.3 Round modifiers
 
 At round start, the seeded RNG draws one modifier. It is announced on the lower screen in 14-segment capitals for 12 ticks.

@@ -5,6 +5,7 @@
  */
 import type { GameState } from "../sim/state";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
+import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import type { Screen } from "./types";
 import type { TextSpec } from "./text";
 import { PANEL_W } from "./dims";
@@ -50,6 +51,22 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   }
 
   if (screen === "lower") {
+    // The Steward is always on his mark; his pose tracks the boredom meter.
+    lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+
+    if (state.phase !== "title") {
+      const filled = Math.round((state.boredom / BOREDOM_MAX) * 10);
+      for (let i = 0; i < filled; i++) lit.add(`boredom.p${i}`);
+      texts.push({
+        text: String(state.nearMisses),
+        x: PANEL_W - 4,
+        y: 2,
+        cell: 7,
+        kind: "seg7",
+        align: "right",
+      });
+    }
+
     if (state.phase === "title") {
       texts.push(...TITLE_TEXTS);
     } else if (state.phase === "cleared") {

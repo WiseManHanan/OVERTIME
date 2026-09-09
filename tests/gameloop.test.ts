@@ -65,7 +65,9 @@ describe("bolts and round clear (doc §5.5)", () => {
       expect(s.bolts[b]).toBe(true);
     }
     expect(s.phase).toBe("cleared");
-    expect(s.score).toBe(POINTS_PER_BOLT * 4 + POINTS_PER_ROUND_CLEAR);
+    // Face value is 4 bolts + the clear bonus; the boredom multiplier can only
+    // lift it here, since a run of releases keeps the meter draining (doc §6.2).
+    expect(s.score).toBeGreaterThanOrEqual(POINTS_PER_BOLT * 4 + POINTS_PER_ROUND_CLEAR);
 
     for (let i = 0; i < ROUND_CLEARED_TICKS; i++) s = step(s, null);
     expect(s.phase).toBe("playing");
@@ -98,6 +100,24 @@ describe("misses and game over (doc §5.6)", () => {
     expect(s.phase).toBe("over");
     expect(s.pip).toEqual(initialState(1).pip);
     expect(s.tick).toBe(base.tick + 1);
+  });
+
+  it("a swing that ended the run still falls on the GAME OVER screen", () => {
+    let s: GameState = { ...initialState(1), phase: "over", swipe: 2 };
+    s = step(s, null);
+    expect(s.swipe).toBe(1);
+    s = step(s, null);
+    expect(s.swipe).toBe(0);
+    s = step(s, null);
+    expect(s.swipe).toBe(0); // and it stays down
+  });
+
+  it("Bruno is not frozen mid-swing through the ROUND CLEAR countdown", () => {
+    let s = quietPlaying({ phase: "cleared", clearedCountdown: ROUND_CLEARED_TICKS, swipe: 2 });
+    s = step(s, null);
+    expect(s.swipe).toBe(1);
+    s = step(s, null);
+    expect(s.swipe).toBe(0);
   });
 });
 
