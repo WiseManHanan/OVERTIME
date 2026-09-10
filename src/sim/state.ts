@@ -11,6 +11,7 @@ import { BOLT_SLOTS } from "./world";
 import { seedRng, type RngState } from "./rng";
 import { roundParams } from "./rounds";
 import { BOREDOM_START } from "./scoring";
+import type { ClockMode } from "./clock";
 import type { Hazard } from "./hazards";
 
 export type Facing = -1 | 1;
@@ -37,6 +38,8 @@ export interface Pip {
 
 export interface GameState {
   readonly seed: number;
+  /** Time-of-day mode, resolved from the real clock once at run start (§7.1). */
+  readonly clock: ClockMode;
   tick: number;
   rng: RngState;
   phase: RunPhase;
@@ -106,10 +109,11 @@ export function freshPip(): Pip {
   };
 }
 
-export function initialState(seed: number): GameState {
+export function initialState(seed: number, clock: ClockMode = "standard"): GameState {
   const first = roundParams(1);
   return {
     seed,
+    clock,
     tick: 0,
     rng: seedRng(seed),
     phase: "title",

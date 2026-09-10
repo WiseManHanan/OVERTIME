@@ -47,10 +47,11 @@ export function clampBoredom(n: number): number {
   return n < 0 ? 0 : n > BOREDOM_MAX ? BOREDOM_MAX : Math.round(n);
 }
 
-export function nextBoredom(prev: number, ev: BoredomEvent): number {
+/** `fillRate` scales the *fill* side only (SLUMP fills 60% faster, doc §7.1). */
+export function nextBoredom(prev: number, ev: BoredomEvent, fillRate = 1): number {
   let d = 0;
-  if (!ev.engaged) d += ev.underThreat ? FILL_IDLE : FILL_SAFE;
-  if (ev.staleFloor) d += FILL_STALE_FLOOR;
+  if (!ev.engaged) d += (ev.underThreat ? FILL_IDLE : FILL_SAFE) * fillRate;
+  if (ev.staleFloor) d += FILL_STALE_FLOOR * fillRate;
   if (ev.floorChanged) d -= DRAIN_FLOOR;
   d -= ev.nearMisses * DRAIN_NEAR_MISS;
   if (ev.boltReleased) d -= DRAIN_BOLT;
@@ -75,8 +76,15 @@ export function boredomMultiplier(boredom: number, asleep: boolean): number {
   return 1;
 }
 
-export function awardPoints(raw: number, boredom: number, asleep: boolean): number {
-  return Math.round(raw * boredomMultiplier(boredom, asleep));
+/** `extra` is the time-of-day / interlude multiplier stacked on top of the
+ *  boredom multiplier (OVERTIME and NIGHT-clear both double, doc §7.1). */
+export function awardPoints(
+  raw: number,
+  boredom: number,
+  asleep: boolean,
+  extra = 1,
+): number {
+  return Math.round(raw * boredomMultiplier(boredom, asleep) * extra);
 }
 
 export type StewardMood = "idle" | "bell" | "watch" | "asleep";

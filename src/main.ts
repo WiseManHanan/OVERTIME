@@ -15,6 +15,7 @@ import { sceneFor } from "./panel/scene";
 import { initialState, type GameState } from "./sim/state";
 import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
+import { clockParams, resolveClock } from "./sim/clock";
 import { stewardMood } from "./sim/scoring";
 import { createBeeper, type Cue } from "./audio/beeper";
 import { loadMute, saveMute } from "./store/persist";
@@ -92,7 +93,12 @@ function playFirst(cues: ReadonlySet<Cue>): void {
   }
 }
 
-let state = initialState(Date.now() >>> 0);
+// A run starts with the wall clock read once (doc §7.1) — resolved here, never
+// inside step().
+function freshRun(): GameState {
+  return initialState(Date.now() >>> 0, resolveClock(new Date()));
+}
+let state = freshRun();
 
 // Blink the cross-pad's LEFT/RIGHT in the title state (doc §9.3). Driven by the
 // phase, so it comes back on a restart after GAME OVER.
@@ -100,6 +106,7 @@ function syncHints(): void {
   const inTitle = state.phase === "title";
   shell.dpad.left.classList.toggle("hint", inTitle);
   shell.dpad.right.classList.toggle("hint", inTitle);
+  shell.statusStrip.textContent = clockParams(state.clock).label;
 }
 syncHints();
 
@@ -160,8 +167,10 @@ function startLoop(): void {
     acc += now - last;
     last = now;
 
-    // The round speed table scales the tick rate, not the sim (doc §6.1).
-    const tickMs = BASE_TICK_MS / roundParams(state.round).speed;
+    // The round speed table (doc §6.1) and the time-of-day mode (doc §7.1) both
+    // scale the tick rate, not the sim.
+    const tickMs =
+      BASE_TICK_MS / (roundParams(state.round).speed * clockParams(state.clock).speed);
     if (acc > tickMs * MAX_CATCHUP_TICKS) acc = tickMs * MAX_CATCHUP_TICKS;
 
     let dirty = false;
@@ -171,7 +180,7 @@ function startLoop(): void {
       const action = input.drain();
       const prev = state;
       if (state.phase === "over" && action === "a") {
-        state = initialState(Date.now() >>> 0); // a fresh seeded run
+        state = freshRun(); // a fresh seeded run, clock re-read
       } else {
         state = step(state, action);
         for (const c of cuesBetween(prev, state)) cues.add(c);

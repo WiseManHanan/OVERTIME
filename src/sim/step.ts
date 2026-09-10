@@ -37,6 +37,7 @@ import {
 import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
+import { clockParams } from "./clock";
 import {
   BOREDOM_START,
   BOREDOM_STALE_FLOOR_TICKS,
@@ -184,6 +185,8 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const params = roundParams(state.round);
+  const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
+  const brunoHere = state.tick >= cp.brunoAwayUntil; // off to lunch / asleep otherwise
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -193,10 +196,12 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
 
   // 0 — Bruno paces his beat on the platform (whole and intact until the last
   //     holder goes), reversing at the ends. He throws from, and swings from,
-  //     wherever he now stands (doc §5.5).
+  //     wherever he now stands (doc §5.5). MORNING he shuffles at half rate;
+  //     LUNCH / NIGHT he is not on the platform at all.
   let brunoSlot = state.brunoSlot;
   let brunoDir = state.brunoDir;
-  if ((state.tick + 1) % BRUNO_PACE_TICKS === 0) {
+  const paceEvery = state.tick < cp.brunoSlowUntil ? BRUNO_PACE_TICKS * 2 : BRUNO_PACE_TICKS;
+  if (brunoHere && (state.tick + 1) % paceEvery === 0) {
     if (brunoSlot + brunoDir < BRUNO_MIN_SLOT || brunoSlot + brunoDir > BRUNO_MAX_SLOT) {
       brunoDir = -brunoDir as -1 | 1;
     }
@@ -220,13 +225,14 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     Resolved before the haul warps Pip away, so the swing still lands.
   let swipeCountdown = state.swipeCountdown - 1;
   let swipe = Math.max(0, state.swipe - 1);
-  if (swipeCountdown === 1) {
+  if (brunoHere && swipeCountdown === 1) {
     swipe = 2; // windup: arm out, no hit yet
   }
   if (swipeCountdown <= 0) {
     swipeCountdown = params.swipeCadence;
-    swipe = 2;
+    swipe = brunoHere ? 2 : 0;
     const inReach =
+      brunoHere &&
       pip.floor === 4 &&
       Math.abs(pip.slot - brunoSlot) <= SWIPE_REACH &&
       pip.pose !== "jump" &&
@@ -301,9 +307,10 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
 
   // 4 — spawn: the new hazard appears now but is checked only from next tick, so
   //     every one gets at least a tick of telegraph (doc §5.4). A haul tick
-  //     spawns nothing — the stage just went quiet — and resets the cadence.
+  //     spawns nothing — the stage just went quiet — and resets the cadence; and
+  //     nothing is thrown while Bruno is away (LUNCH / NIGHT).
   let spawnCountdown = hauled ? params.hazardCadence : state.spawnCountdown - 1;
-  if (!hauled && spawnCountdown <= 0) {
+  if (brunoHere && !hauled && spawnCountdown <= 0) {
     const [hazard, next] = spawnHazard(brunoSlot, state.round, rng);
     rng = next;
     survivors.push(hazard);
@@ -323,14 +330,18 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     pip.pose === "jump" ||
     pip.pose === "duck" ||
     nearMisses > 0;
-  const boredom = nextBoredom(state.boredom, {
-    engaged,
-    floorChanged,
-    underThreat: survivors.some((h) => h.floor === pip.floor),
-    staleFloor: ticksSinceFloorChange > BOREDOM_STALE_FLOOR_TICKS,
-    nearMisses,
-    boltReleased: outcome.releasedBolt >= 0,
-  });
+  const boredom = nextBoredom(
+    state.boredom,
+    {
+      engaged,
+      floorChanged,
+      underThreat: survivors.some((h) => h.floor === pip.floor),
+      staleFloor: ticksSinceFloorChange > BOREDOM_STALE_FLOOR_TICKS,
+      nearMisses,
+      boltReleased: outcome.releasedBolt >= 0,
+    },
+    cp.boredomRate,
+  );
   const stewardAsleep = nextAsleep(state.stewardAsleep, boredom);
 
   // 7 — resolve the round
@@ -345,7 +356,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     rawPoints += POINTS_PER_ROUND_CLEAR;
   }
 
-  const score = state.score + awardPoints(rawPoints, boredom, stewardAsleep);
+  const score =
+    state.score + awardPoints(rawPoints, boredom, stewardAsleep, cp.points);
 
   return {
     ...state,
