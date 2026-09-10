@@ -386,31 +386,93 @@ function brunoSwipeShapes(cx: number): Shape[] {
 const PLATFORM_WEST = 3;
 const PLATFORM_EAST = slotCenterX(9) + 2;
 
-/** Four frames of the platform pivoting off its west anchor once the last holder
- *  is pulled — the free end swings down, Bruno slides off it and out of frame. */
+/** A point (lx,ly) in a body-local frame rotated by `rot` and placed at (cx,cy). */
+function rot(cx: number, cy: number, lx: number, ly: number, r: number): [number, number] {
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return [cx + lx * c - ly * s, cy + lx * s + ly * c];
+}
+/** A rectangle of half-extents (hw,hh) centred at (cx,cy), rotated by `r`. */
+function rotRect(cx: number, cy: number, hw: number, hh: number, r: number): Shape {
+  return poly([
+    rot(cx, cy, -hw, -hh, r),
+    rot(cx, cy, hw, -hh, r),
+    rot(cx, cy, hw, hh, r),
+    rot(cx, cy, -hw, hh, r),
+  ]);
+}
+
+/** Bruno tumbling free of the wreck — a recognisable figure (hard hat, blocky
+ *  limbs) rotated by `r`, arms and legs flung out by `spread` (0..1). Feet-down
+ *  in its own frame, centred at (cx,cy). */
+function brunoTumbleShapes(cx: number, cy: number, r: number, spread: number): Shape[] {
+  const a = spread;
+  const q = (
+    x0: number, y0: number, x1: number, y1: number,
+    x2: number, y2: number, x3: number, y3: number,
+  ): Shape =>
+    poly([rot(cx, cy, x0, y0, r), rot(cx, cy, x1, y1, r), rot(cx, cy, x2, y2, r), rot(cx, cy, x3, y3, r)]);
+  return [
+    q(-3.2, -9.6, 3.2, -9.6, 3.2, -5.4, -3.2, -5.4), // head
+    q(-4.4, -12.6, 4.4, -13.2, 5, -9.6, -5, -9), // hard hat, brim flared
+    q(-3.8, -5.4, 3.8, -5.4, 3.2, 3.4, -3.2, 3.4), // torso
+    q(-3.6, -4.6, -7 - a * 4, -7.5 - a * 3.5, -8.6 - a * 4, -5.2 - a * 3.5, -5, -2.4), // near arm, windmilling
+    q(3.6, -4.6, 7 + a * 4, -8.5 - a * 3, 8.6 + a * 4, -6.2 - a * 3, 5, -2.4), // far arm
+    q(-3.2, 3.2, -5.6 - a * 3, 8.6 + a * 2.5, -3.4 - a * 3, 10 + a * 2.5, -1, 4), // near leg, kicking
+    q(1.2, 4, 3.6 + a * 3, 9 + a * 2.5, 5.6 + a * 3, 10.6 + a * 2.5, 3.2, 3.2), // far leg
+  ];
+}
+
+/** Four frames of the collapse (k = 0..3): the girder shears off its west
+ *  anchor and tips (0), then breaks into pieces that spin away (1..3), while
+ *  Bruno tumbles down his own arc, losing the hat on the way. */
 function brunoFallShapes(k: number): Shape[] {
   const ax = PLATFORM_WEST;
   const ay = PLATFORM_Y;
   const len = PLATFORM_EAST - ax;
-  const ang = [0.16, 0.44, 0.82, 1.2][k]!;
-  const ex = ax + len * Math.cos(ang);
-  const ey = ay + len * Math.sin(ang);
-  const nx = Math.sin(ang);
-  const ny = -Math.cos(ang);
-  const th = 2.6;
-  // Bruno riding the beam, sliding toward the low end and tumbling as he goes
-  const t = Math.min(0.96, 0.5 + k * 0.16);
-  const bx = ax + len * t * Math.cos(ang);
-  const by = ay + len * t * Math.sin(ang) - 3;
-  const g = k * 2;
-  return [
-    poly([[ax, ay], [ex, ey], [ex + nx * th, ey + ny * th], [ax + nx * th, ay + ny * th]]), // the beam
-    rect(0, ay - 6, 3.4, 15), // the wall plate, still bolted to the edge
-    poly([[bx - 5, by - 4 - g], [bx + 5, by - 5 - g], [bx + 6, by + 2], [bx - 4, by + 3]]), // body
-    poly([[bx - 6, by - 8 - g], [bx - 1, by - 9 - g], [bx, by - 4 - g], [bx - 5, by - 3 - g]]), // hat, flung
-    poly([[bx + 3, by - 2], [bx + 7, by - 3], [bx + 9, by + 3 + k], [bx + 6, by + 4 + k]]), // arm out
-    poly([[bx - 3, by + 3], [bx + 1, by + 3], [bx - 1, by + 9], [bx - 5, by + 8]]), // leg
-  ];
+  const ang = [0.22, 0.6, 1.05, 1.55][k]!;
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  const th = 1.6;
+
+  const shapes: Shape[] = [rect(0, ay - 6, 3.4, 15)]; // the wall plate, still bolted
+
+  if (k === 0) {
+    // still one piece — sheared off the anchor and tipping
+    const ex = ax + len * c;
+    const ey = ay + len * s;
+    shapes.push(poly([[ax, ay], [ex, ey], [ex + s * th * 2, ey - c * th * 2], [ax + s * th * 2, ay - c * th * 2]]));
+    shapes.push(poly([[ax + len * 0.34, ay + len * 0.34 * s], [ax + len * 0.42, ay + len * 0.42 * s + 2.6], [ax + len * 0.3, ay + len * 0.3 * s + 2.6]]));
+  } else {
+    // broken into four sections, each drifting and spinning further each frame
+    const N = 4;
+    for (let i = 0; i < N; i++) {
+      const d = ((i + 0.5) / N) * len;
+      const chaos = k * k;
+      const hx = ax + d * c + chaos * (i - 1) * 1.6;
+      const hy = ay + d * s + chaos * (i + 1) * 2.2;
+      const spin = ang + k * 0.6 * (i % 2 ? 1 : -1) * ((i + 1) / N);
+      const hw = Math.max(3, len / N / 2 - 2 - k);
+      shapes.push(rotRect(hx, hy, hw, th, spin));
+      shapes.push(poly([
+        rot(hx, hy, -hw * 0.3, th, spin),
+        rot(hx, hy, hw * 0.3, th, spin),
+        rot(hx, hy, 0, th + 2.6, spin),
+      ])); // a broken lattice tooth
+    }
+  }
+
+  // Bruno on his own arc — starts at the platform's east end, falls and spins
+  // ~270deg across the four frames, hat off from frame 1.
+  const bx = PLATFORM_EAST - 16 + k * 4;
+  const by = PLATFORM_Y + 4 + [0, 17, 40, 66][k]!;
+  const brot = 0.25 + k * 1.4;
+  const spread = Math.min(1, 0.3 + k * 0.28);
+  shapes.push(...brunoTumbleShapes(bx, by, brot, spread));
+  if (k >= 1) {
+    shapes.push(rotRect(bx + 8 + k * 3, by - 10 - k * 2.5, 4.6, 1.7, brot * 1.4 + 1.2)); // the flung hat
+  }
+  return shapes;
 }
 
 /** Bruno's platform: one beam, west end fixed to the wall by an anchor bracket,

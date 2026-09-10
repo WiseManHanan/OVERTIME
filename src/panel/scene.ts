@@ -65,8 +65,10 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
 
     if (state.phase !== "title") {
-      texts.push({ text: String(state.score), x: PANEL_W - 4, y: 2, cell: 8, kind: "seg7", align: "right" });
-      texts.push({ text: String(state.round), x: 4, y: 2, cell: 8, kind: "seg7", align: "left" });
+      // Stacked in the top-left corner — clear of the gantry (top-right) and the
+      // miss pips (top-centre).
+      texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
+      texts.push({ text: String(state.score), x: 3, y: 10, cell: 7, kind: "seg7", align: "left" });
     }
   }
 
