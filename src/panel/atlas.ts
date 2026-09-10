@@ -438,11 +438,12 @@ function brunoFallShapes(k: number): Shape[] {
   const shapes: Shape[] = [rect(0, ay - 6, 3.4, 15)]; // the wall plate, still bolted
 
   if (k === 0) {
-    // still one piece — sheared off the anchor and tipping
+    // still one piece — sheared off the anchor and tipping, with a first crack
     const ex = ax + len * c;
     const ey = ay + len * s;
     shapes.push(poly([[ax, ay], [ex, ey], [ex + s * th * 2, ey - c * th * 2], [ax + s * th * 2, ay - c * th * 2]]));
-    shapes.push(poly([[ax + len * 0.34, ay + len * 0.34 * s], [ax + len * 0.42, ay + len * 0.42 * s + 2.6], [ax + len * 0.3, ay + len * 0.3 * s + 2.6]]));
+    const cd = (f: number, dy: number): [number, number] => [ax + len * f * c, ay + len * f * s + dy];
+    shapes.push(poly([cd(0.34, 0), cd(0.42, 2.6), cd(0.3, 2.6)]));
   } else {
     // broken into four sections, each drifting and spinning further each frame
     const N = 4;

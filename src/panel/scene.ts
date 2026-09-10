@@ -65,10 +65,10 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
 
     if (state.phase !== "title") {
-      // Stacked in the top-left corner — clear of the gantry (top-right) and the
-      // miss pips (top-centre).
+      // One line across the very top-left: above Pip's tallest reach on floor 4
+      // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
-      texts.push({ text: String(state.score), x: 3, y: 10, cell: 7, kind: "seg7", align: "left" });
+      texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
     }
   }
 
