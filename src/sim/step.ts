@@ -60,9 +60,9 @@ export function step(state: GameState, input: InputAction | null): GameState {
     case "cleared":
       return stepCleared(state);
     case "over":
-      // A trap state, but the swing that ended the run still needs to fall (the
-      // GAME OVER screen shows the upper panel — a frozen Bruno reads as a bug).
-      return { ...state, tick: state.tick + 1, swipe: Math.max(0, state.swipe - 1) };
+      // A trap state: the GAME OVER screen is a bare readout (scene.ts), so
+      // nothing here matters but keeping the tick counter moving.
+      return { ...state, tick: state.tick + 1 };
   }
 }
 

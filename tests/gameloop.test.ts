@@ -109,21 +109,13 @@ describe("misses and game over (doc §5.6)", () => {
   });
 
   it("game over is a trap state — step only advances the tick", () => {
-    const base = { ...initialState(1), phase: "over" as const, score: 900 };
-    const s = step(base, "right");
+    let s: GameState = { ...initialState(1), phase: "over", score: 900, swipe: 2 };
+    s = step(s, "right");
     expect(s.phase).toBe("over");
     expect(s.pip).toEqual(initialState(1).pip);
-    expect(s.tick).toBe(base.tick + 1);
-  });
-
-  it("a swing that ended the run still falls on the GAME OVER screen", () => {
-    let s: GameState = { ...initialState(1), phase: "over", swipe: 2 };
-    s = step(s, null);
-    expect(s.swipe).toBe(1);
-    s = step(s, null);
-    expect(s.swipe).toBe(0);
-    s = step(s, null);
-    expect(s.swipe).toBe(0); // and it stays down
+    expect(s.tick).toBe(1);
+    expect(s.score).toBe(900); // nothing changes on the results screen
+    expect(s.swipe).toBe(2);
   });
 
   it("Bruno is not frozen mid-swing through the ROUND CLEAR countdown", () => {

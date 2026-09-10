@@ -434,10 +434,10 @@ function brunoPlatformSeg(): Seg {
             [w + 6 + i * step, y + 4],
           ]),
       ),
-      // west anchor: a plate bolted flat to the side of the screen, gusset to
-      // the beam, a couple of rivets
+      // west anchor: a plate bolted flat to the panel edge (x 0 by design), a
+      // gusset bridging it to the beam at `w`, and a couple of rivets
       rect(0, y - 6, 3.4, 15),
-      poly([[3, y - 3], [12, y - 1], [12, y + 4], [3, y + 9]]),
+      poly([[0, y - 4], [w + 8, y - 1], [w + 8, y + 4], [0, y + 9]]),
       { k: "circle", cx: 1.7, cy: y - 3, r: 1 },
       { k: "circle", cx: 1.7, cy: y + 6, r: 1 },
     ],
