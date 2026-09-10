@@ -38,6 +38,7 @@ import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
 import { clockParams } from "./clock";
+import { batteryDead, hasStuckSegment, nextBattery, pickStuckPose } from "./battery";
 import {
   BOREDOM_START,
   BOREDOM_STALE_FLOOR_TICKS,
@@ -181,6 +182,7 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
     playingSince: state.tick + 1, // round 1 clock windows start now
+    roundClean: true,
   };
 }
 
@@ -349,6 +351,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const stewardAsleep = nextAsleep(state.stewardAsleep, boredom);
 
   // 7 — resolve the round
+  const tookMiss = misses > state.misses; // any miss this tick (pre-clamp)
   misses = Math.min(misses, MISSES_ALLOWED); // two hits in one tick still ends at 3
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
@@ -383,6 +386,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     stewardAsleep,
     nearMisses: state.nearMisses + nearMisses,
     ticksSinceFloorChange,
+    roundClean: state.roundClean && !tookMiss,
   };
 }
 
@@ -397,13 +401,43 @@ function stepCleared(state: GameState): GameState {
       swipe: Math.max(0, state.swipe - 1),
     };
   }
+  // The battery drains between rounds once it has started failing (doc §7.3).
+  const battery = nextBattery(
+    state.battery,
+    state.round,
+    state.clock,
+    state.roundClean,
+  );
+  if (batteryDead(battery)) {
+    // A flat console is a legitimate end to the run — the score stands.
+    return { ...state, tick: state.tick + 1, phase: "over", battery: 0 };
+  }
+
   const round = state.round + 1;
   const params = roundParams(round);
+
+  // A stuck pose (dark) and a phantom (lit) are re-rolled for the new round.
+  let rng = state.rng;
+  let stuckDark = null;
+  let stuckLit = null;
+  if (hasStuckSegment(battery)) {
+    const [d, r1] = pickStuckPose(rng);
+    const [l, r2] = pickStuckPose(r1);
+    rng = r2;
+    stuckDark = d;
+    stuckLit = l;
+  }
+
   return {
     ...state,
     tick: state.tick + 1,
     phase: "playing",
     round,
+    rng,
+    battery,
+    roundClean: true,
+    stuckDark,
+    stuckLit,
     pip: freshPip(),
     hazards: [],
     bolts: state.bolts.map(() => false),

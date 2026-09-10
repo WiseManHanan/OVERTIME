@@ -81,6 +81,15 @@ body {
   gap: 11px;
   user-select: none;
   -webkit-user-select: none;
+  transition: filter 0.4s ease;
+}
+
+/* The failing console (doc §7.3): the whole shell sags, then goes dark. */
+.shell.dying {
+  filter: brightness(0.92) saturate(0.8) contrast(0.96);
+}
+.shell.dead {
+  filter: brightness(0.5) saturate(0.35) contrast(0.9);
 }
 
 .screens {

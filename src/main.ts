@@ -16,6 +16,7 @@ import { initialState, type GameState } from "./sim/state";
 import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
 import { clockParams, resolveClock } from "./sim/clock";
+import { batteryContrast, batteryDetune, isBlackoutTick } from "./sim/battery";
 import { stewardMood } from "./sim/scoring";
 import { createBeeper, type Cue } from "./audio/beeper";
 import { loadMute, saveMute } from "./store/persist";
@@ -140,10 +141,20 @@ function ctxFor(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 
 function viewFor(screen: Screen): PanelView {
   const scene = sceneFor(state, screen);
-  return { screen, lit: scene.lit, texts: scene.texts, contrast: 1 };
+  return {
+    screen,
+    lit: scene.lit,
+    texts: scene.texts,
+    contrast: batteryContrast(state.battery),
+    blackout: isBlackoutTick(state.battery, state.tick),
+  };
 }
 
 function paint(): void {
+  // The failing console tints the whole shell as it sags (doc §7.3).
+  shell.root.classList.toggle("dying", state.battery > 0 && state.battery < 0.3);
+  shell.root.classList.toggle("dead", state.phase === "over" && state.battery <= 0);
+  beeper.setDetune(batteryDetune(state.battery));
   renderPanel(ctxFor(shell.upper), viewFor("upper"), pal);
   renderPanel(ctxFor(shell.lower), viewFor("lower"), pal);
 }

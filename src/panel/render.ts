@@ -26,6 +26,9 @@ export interface PanelView {
   texts: readonly TextSpec[];
   /** Battery contrast modifier (doc §7.3). 1 = full; applied to the lit segment pass only. */
   contrast: number;
+  /** A battery blackout tick (doc §7.3): the lit pass is skipped for this one
+   *  frame — the panel drops to the printed backdrop while the sim runs on. */
+  blackout?: boolean;
   /** Power-on self-test: light every segment regardless of `lit` (doc §9.1). */
   selfTest?: boolean;
 }
@@ -60,15 +63,18 @@ export function renderPanel(
   for (const spec of view.texts) drawTextLayer(ctx, spec, false);
 
   // 4 + 5 — the lit subset at --segment, with the battery contrast modifier
-  // riding this pass only (doc §4.3 step 5).
-  ctx.fillStyle = pal.segment;
-  ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
-  for (const seg of segs) {
-    if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
+  // riding this pass only (doc §4.3 step 5). A blackout tick skips it entirely.
+  const blackout = view.blackout === true && !selfTest;
+  if (!blackout) {
+    ctx.fillStyle = pal.segment;
+    ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
+    for (const seg of segs) {
+      if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
+    }
   }
 
   // On-panel text (score, messages, Steward dialogue) is not an atlas segment;
   // step 5 dims step 4 only, so the readout holds full contrast as battery falls.
   ctx.globalAlpha = 1;
-  for (const spec of view.texts) drawTextLayer(ctx, spec, !selfTest);
+  if (!blackout) for (const spec of view.texts) drawTextLayer(ctx, spec, !selfTest);
 }
