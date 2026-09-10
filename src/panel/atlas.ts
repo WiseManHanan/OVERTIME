@@ -381,8 +381,9 @@ function brunoSwipeShapes(cx: number): Shape[] {
   ];
 }
 
-/** Anchor x of the platform (its west pivot) and its free (east) end. */
-const PLATFORM_WEST = slotCenterX(1) - 2;
+/** Anchor x of the platform (its west pivot, bolted to the side of the screen)
+ *  and its free (east) end. */
+const PLATFORM_WEST = 3;
 const PLATFORM_EAST = slotCenterX(9) + 2;
 
 /** Four frames of the platform pivoting off its west anchor once the last holder
@@ -404,7 +405,7 @@ function brunoFallShapes(k: number): Shape[] {
   const g = k * 2;
   return [
     poly([[ax, ay], [ex, ey], [ex + nx * th, ey + ny * th], [ax + nx * th, ay + ny * th]]), // the beam
-    poly([[ax - 6, ay + 3], [ax, ay - 1], [ax, ay + 5]]), // the west anchor stub, holding
+    rect(0, ay - 6, 3.4, 15), // the wall plate, still bolted to the edge
     poly([[bx - 5, by - 4 - g], [bx + 5, by - 5 - g], [bx + 6, by + 2], [bx - 4, by + 3]]), // body
     poly([[bx - 6, by - 8 - g], [bx - 1, by - 9 - g], [bx, by - 4 - g], [bx - 5, by - 3 - g]]), // hat, flung
     poly([[bx + 3, by - 2], [bx + 7, by - 3], [bx + 9, by + 3 + k], [bx + 6, by + 4 + k]]), // arm out
@@ -433,9 +434,12 @@ function brunoPlatformSeg(): Seg {
             [w + 6 + i * step, y + 4],
           ]),
       ),
-      // west anchor: a gusset tying the beam into the wall
-      poly([[w - 3, y - 1], [w + 6, y - 1], [w + 6, y + 5], [w - 3, y + 8]]),
-      rect(w - 5, y - 2, 2.4, 12), // the wall post it bolts to
+      // west anchor: a plate bolted flat to the side of the screen, gusset to
+      // the beam, a couple of rivets
+      rect(0, y - 6, 3.4, 15),
+      poly([[3, y - 3], [12, y - 1], [12, y + 4], [3, y + 9]]),
+      { k: "circle", cx: 1.7, cy: y - 3, r: 1 },
+      { k: "circle", cx: 1.7, cy: y + 6, r: 1 },
     ],
   };
 }

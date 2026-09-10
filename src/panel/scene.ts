@@ -25,16 +25,20 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const lit = new Set<string>();
   const texts: TextSpec[] = [];
   const p = state.pip;
+  // GAME OVER is a results screen — the scaffold clears to just the readout.
+  const live = state.phase !== "over";
 
-  if (floorScreen(p.floor) === screen) {
+  if (live && floorScreen(p.floor) === screen) {
     lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
   }
 
-  for (const h of state.hazards) {
-    if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
+  if (live) {
+    for (const h of state.hazards) {
+      if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
+    }
   }
 
-  if (screen === "upper") {
+  if (screen === "upper" && live) {
     if (state.phase === "cleared") {
       // Last holder pulled: the platform pivots off its anchor and takes Bruno
       // with it, across the ROUND CLEARED window (doc §5.5).
@@ -52,8 +56,8 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       });
     }
 
-    // The one console: as many levers down as sections snatched, plus a flicker
-    // to the next while Pip is hauling it (doc §5.5).
+    // The one console: as many levers down as holders cut, plus a flicker to the
+    // next while Pip is hauling it (doc §5.5).
     const down = state.bolts.filter(Boolean).length;
     const hauling = p.releasing > 0 && state.tick % 2 === 0;
     lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
@@ -70,7 +74,7 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     // The Steward is always on his mark; his pose tracks the boredom meter.
     lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
 
-    if (state.phase !== "title") {
+    if (state.phase === "playing" || state.phase === "cleared") {
       const filled = Math.round((state.boredom / BOREDOM_MAX) * 10);
       for (let i = 0; i < filled; i++) lit.add(`boredom.p${i}`);
       texts.push({
@@ -88,8 +92,11 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     } else if (state.phase === "cleared") {
       texts.push({ text: "ROUND CLEAR", x: PANEL_W / 2, y: 14, cell: 9, kind: "seg14", align: "center" });
     } else if (state.phase === "over") {
-      texts.push({ text: "GAME OVER", x: PANEL_W / 2, y: 8, cell: 11, kind: "seg14", align: "center" });
-      texts.push({ text: "PRESS A", x: PANEL_W / 2, y: 30, cell: 8, kind: "seg14", align: "center" });
+      // Holds here until the A button — nothing else dismisses it (main.ts).
+      texts.push({ text: "GAME OVER", x: PANEL_W / 2, y: 12, cell: 11, kind: "seg14", align: "center" });
+      texts.push({ text: "SCORE", x: PANEL_W / 2, y: 34, cell: 6, kind: "seg14", align: "center" });
+      texts.push({ text: String(state.score), x: PANEL_W / 2, y: 44, cell: 14, kind: "seg7", align: "center" });
+      texts.push({ text: "PRESS A", x: PANEL_W / 2, y: 68, cell: 7, kind: "seg14", align: "center" });
     }
   }
 
