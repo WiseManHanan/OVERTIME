@@ -73,6 +73,10 @@ export interface GameState {
   nearMisses: number;
   /** Ticks since Pip last changed floor; feeds the boredom meter. */
   ticksSinceFloorChange: number;
+  /** `tick` value when the current playing stretch began — so a mode's
+   *  "first N ticks of the round" window (doc §7.1) is measured from the round,
+   *  not from run start. */
+  playingSince: number;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -133,6 +137,7 @@ export function initialState(seed: number, clock: ClockMode = "standard"): GameS
     stewardAsleep: false,
     nearMisses: 0,
     ticksSinceFloorChange: 0,
+    playingSince: 0,
   };
 }
 

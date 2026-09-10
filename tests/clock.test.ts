@@ -75,11 +75,33 @@ describe("clock modes bend the run (doc §7.1)", () => {
     expect(s.hazards.length).toBe(0);
   });
 
-  it("NIGHT: Bruno stays away all round and points double", () => {
+  it("NIGHT: Bruno stays away all round; ordinary points are NOT doubled", () => {
     let s = quiet("night", { spawnCountdown: 1, hazards: [mkBarrel(1, 3, 1)] });
     s = { ...s, pip: { ...s.pip, floor: 1, slot: 4 } };
     s = step(s, "right");
     expect(s.hazards.filter((h) => h.floor === 4).length).toBe(0); // nothing thrown
-    expect(s.score).toBe(50 * 1.5 * 2); // near miss * boredom(×1.5 draining) * NIGHT(×2)
+    expect(s.score).toBe(50 * 1.5); // near miss * boredom (×1.5 draining), no NIGHT ×2
+  });
+
+  it("NIGHT: only the round-clear bonus is doubled (doc §7.1)", () => {
+    const clearScore = (clock: ClockMode): number => {
+      let s = quiet(clock, {
+        bolts: [true, true, true, false],
+        boredom: 70, // stays in the ×1.0 band after the haul's drains
+        pip: { ...quiet(clock).pip, floor: 4, slot: 8, releasing: 1, releasingBolt: 3 },
+      });
+      s = step(s, null); // completes the 4th holder -> round clears
+      expect(s.phase).toBe("cleared");
+      return s.score;
+    };
+    expect(clearScore("night") - clearScore("standard")).toBe(750); // one extra clear bonus
+  });
+
+  it("a clock window is measured per round, not from run start", () => {
+    // Bruno is 'away' for the first 60 ticks of every round in LUNCH — including
+    // rounds reached long after run start.
+    let s = quiet("lunch", { round: 3, tick: 5000, playingSince: 5000, spawnCountdown: 1 });
+    for (let i = 0; i < 30; i++) s = step(s, null);
+    expect(s.hazards.length).toBe(0); // still within this round's 60-tick window
   });
 });

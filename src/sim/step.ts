@@ -180,13 +180,15 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     pip,
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
+    playingSince: state.tick + 1, // round 1 clock windows start now
   };
 }
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const params = roundParams(state.round);
   const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
-  const brunoHere = state.tick >= cp.brunoAwayUntil; // off to lunch / asleep otherwise
+  const roundTick = state.tick - state.playingSince; // ticks into *this* round
+  const brunoHere = roundTick >= cp.brunoAwayUntil; // off to lunch / asleep otherwise
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -200,7 +202,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     LUNCH / NIGHT he is not on the platform at all.
   let brunoSlot = state.brunoSlot;
   let brunoDir = state.brunoDir;
-  const paceEvery = state.tick < cp.brunoSlowUntil ? BRUNO_PACE_TICKS * 2 : BRUNO_PACE_TICKS;
+  const paceEvery = roundTick < cp.brunoSlowUntil ? BRUNO_PACE_TICKS * 2 : BRUNO_PACE_TICKS;
   if (brunoHere && (state.tick + 1) % paceEvery === 0) {
     if (brunoSlot + brunoDir < BRUNO_MIN_SLOT || brunoSlot + brunoDir > BRUNO_MAX_SLOT) {
       brunoDir = -brunoDir as -1 | 1;
@@ -223,7 +225,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     knocks a lever back up — the one Pip is hauling, or the last one pulled
   //     if he is loitering at the console — but never one secured this same tick.
   //     Resolved before the haul warps Pip away, so the swing still lands.
-  let swipeCountdown = state.swipeCountdown - 1;
+  // While Bruno is away the countdown is held at full, so on his return there is
+  // always a fresh cadence — including the windup — before the first swing.
+  let swipeCountdown = brunoHere ? state.swipeCountdown - 1 : params.swipeCadence;
   let swipe = Math.max(0, state.swipe - 1);
   if (brunoHere && swipeCountdown === 1) {
     swipe = 2; // windup: arm out, no hit yet
@@ -353,7 +357,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   } else if (bolts.every((b) => b)) {
     phase = "cleared";
     clearedCountdown = ROUND_CLEARED_TICKS;
-    rawPoints += POINTS_PER_ROUND_CLEAR;
+    rawPoints += POINTS_PER_ROUND_CLEAR * cp.clearMult; // NIGHT pays double here
   }
 
   const score =
@@ -412,5 +416,6 @@ function stepCleared(state: GameState): GameState {
     boredom: BOREDOM_START, // a fresh round starts back in the neutral band
     stewardAsleep: false,
     ticksSinceFloorChange: 0,
+    playingSince: state.tick + 1, // this round's clock windows start now
   };
 }
