@@ -46,9 +46,15 @@ export interface GameState {
   misses: number;
   pip: Pip;
   hazards: readonly Hazard[];
-  /** One flag per BOLT_SLOTS entry; all true clears the round. */
+  /** One flag per holder, pulled in order. Each pull drops one of the four
+   *  holders at the platform's free end; all four out and the platform pivots
+   *  off its anchor — Bruno goes down, the round clears (doc §5.5). */
   bolts: readonly boolean[];
-  /** Ticks until the next barrel spawns. */
+  /** The slot Bruno is pacing over on his girder (doc §5.5). */
+  brunoSlot: number;
+  /** Which way Bruno is pacing; flips at the ends of his beat. */
+  brunoDir: -1 | 1;
+  /** Ticks until the next hazard spawns. */
   spawnCountdown: number;
   /** Ticks until Bruno's next swipe. */
   swipeCountdown: number;
@@ -71,11 +77,22 @@ export const START_SLOT = 5;
 export const MISSES_ALLOWED = 3;
 export const BOLT_RELEASE_TICKS = 3;
 export const ROUND_CLEARED_TICKS = 18;
+/** The one control console, on the floor-4 deck at the east end by the holders
+ *  and the climb-up ladder. Hauling a lever pulls a holder, sweeps the stage and
+ *  drops Pip back to the start; all four holders out and the platform pivots off
+ *  its west anchor — Bruno goes down with it (doc §5.5). */
+export const CONSOLE_SLOT = 8;
+/** Bruno starts here and paces between BRUNO_MIN_SLOT and BRUNO_MAX_SLOT. */
 export const BRUNO_SLOT = 6;
-/** Slots either side of Bruno his swipe reaches — 5,6,7, matching the drawn arc. */
+export const BRUNO_MIN_SLOT = 2;
+export const BRUNO_MAX_SLOT = 8;
+/** Ticks between Bruno's pacing steps. */
+export const BRUNO_PACE_TICKS = 2;
+/** Slots either side of Bruno his swipe reaches, matching the drawn arc. */
 export const SWIPE_REACH = 1;
 export const POINTS_PER_BOLT = 100;
-export const POINTS_PER_ROUND_CLEAR = 500;
+/** Dropping Bruno is the point of the round — pays well (doc §5.5). */
+export const POINTS_PER_ROUND_CLEAR = 750;
 
 export function freshPip(): Pip {
   return {
@@ -102,6 +119,8 @@ export function initialState(seed: number): GameState {
     pip: freshPip(),
     hazards: [],
     bolts: BOLT_SLOTS.map(() => false),
+    brunoSlot: BRUNO_SLOT,
+    brunoDir: 1,
     spawnCountdown: first.hazardCadence,
     swipeCountdown: first.swipeCadence,
     swipe: 0,

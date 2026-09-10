@@ -4,6 +4,7 @@
  * ids and on-panel text, nothing more.
  */
 import type { GameState } from "../sim/state";
+import { ROUND_CLEARED_TICKS } from "../sim/state";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import type { Screen } from "./types";
@@ -26,21 +27,36 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const p = state.pip;
 
   if (floorScreen(p.floor) === screen) {
-    lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}`);
+    lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
   }
 
   for (const h of state.hazards) {
-    if (floorScreen(h.floor) === screen) lit.add(`barrel.f${h.floor}.s${h.slot}`);
+    if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
   }
 
   if (screen === "upper") {
-    lit.add(state.swipe > 0 ? "bruno.swipe" : "bruno.idle");
+    if (state.phase === "cleared") {
+      // Last holder pulled: the platform pivots off its anchor and takes Bruno
+      // with it, across the ROUND CLEARED window (doc §5.5).
+      const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
+      lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 5)))}`);
+    } else {
+      const face = state.brunoDir === 1 ? "r" : "l";
+      const pose = state.swipe > 0 ? "swipe" : "pace";
+      lit.add(`bruno.${pose}.s${state.brunoSlot}.${face}`);
+      lit.add("bruno.platform");
+      lit.add("gantry");
+      // Each holder stands until Pip pulls its lever at the console.
+      BOLT_SLOTS.forEach((_, i) => {
+        if (state.bolts[i] !== true) lit.add(`holder.s${i}`);
+      });
+    }
 
-    BOLT_SLOTS.forEach((slot, i) => {
-      const releasing =
-        p.releasing > 0 && p.releasingBolt === i && state.tick % 2 === 0;
-      if (state.bolts[i] === true || releasing) lit.add(`bolt.s${slot}`);
-    });
+    // The one console: as many levers down as sections snatched, plus a flicker
+    // to the next while Pip is hauling it (doc §5.5).
+    const down = state.bolts.filter(Boolean).length;
+    const hauling = p.releasing > 0 && state.tick % 2 === 0;
+    lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
 
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
 

@@ -18,10 +18,16 @@ export type Shape =
 /**
  * One physically distinct segment on the glass. Pip at floor 1 slot 3 is a
  * different `Seg` from Pip at floor 1 slot 4 — same shape vocabulary, different
- * `id`, both always ghosted.
+ * `id`, and ghosted every frame (doc §4.3 step 3) unless `noGhost` is set.
+ *
+ * `noGhost` is a narrow exception for Bruno's transient swing and tumble frames:
+ * they are one-off action art, not a pose a viewer reads ahead for, and stacking
+ * four overlapping tumble frames into the ghost layer just smears the panel.
+ * Every gameplay pose — both facings — still ghosts.
  */
 export interface Seg {
-  id: string; // e.g. "pip.f1.s3.stand"
+  id: string; // e.g. "pip.f1.s3.stand.r"
   screen: Screen;
   shapes: Shape[];
+  noGhost?: boolean;
 }

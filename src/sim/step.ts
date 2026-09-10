@@ -12,7 +12,11 @@
 import type { GameState, Pip, PipPose } from "./state";
 import {
   BOLT_RELEASE_TICKS,
+  BRUNO_MAX_SLOT,
+  BRUNO_MIN_SLOT,
+  BRUNO_PACE_TICKS,
   BRUNO_SLOT,
+  CONSOLE_SLOT,
   MISSES_ALLOWED,
   POINTS_PER_BOLT,
   POINTS_PER_ROUND_CLEAR,
@@ -22,7 +26,6 @@ import {
   isAirborne,
 } from "./state";
 import {
-  boltIndexAt,
   floorAbove,
   floorBelow,
   isStandable,
@@ -31,7 +34,7 @@ import {
   ladderUpAt,
   type Floor,
 } from "./world";
-import { advanceHazard, spawnBarrel, type Hazard } from "./hazards";
+import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
 import {
@@ -123,11 +126,12 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
           floor = up;
           pose = "climb";
         }
-      } else if (floor === 4) {
-        const bi = boltIndexAt(slot);
-        if (bi >= 0 && bolts[bi] !== true) {
+      } else if (floor === 4 && slot === CONSOLE_SLOT) {
+        // Haul the next lever that is still up (levers pull left to right).
+        const nextLever = bolts.findIndex((b) => b !== true);
+        if (nextLever >= 0) {
           releasing = BOLT_RELEASE_TICKS;
-          releasingBolt = bi;
+          releasingBolt = nextLever;
           pose = "release";
         }
       }
@@ -187,26 +191,33 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // multiplier (doc §6.2) — so "no points while the Steward sleeps" is exact.
   let rawPoints = 0;
 
+  // 0 — Bruno paces his beat on the platform (whole and intact until the last
+  //     holder goes), reversing at the ends. He throws from, and swings from,
+  //     wherever he now stands (doc §5.5).
+  let brunoSlot = state.brunoSlot;
+  let brunoDir = state.brunoDir;
+  if ((state.tick + 1) % BRUNO_PACE_TICKS === 0) {
+    if (brunoSlot + brunoDir < BRUNO_MIN_SLOT || brunoSlot + brunoDir > BRUNO_MAX_SLOT) {
+      brunoDir = -brunoDir as -1 | 1;
+    }
+    brunoSlot += brunoDir;
+  }
+
   // 1 — Pip
   const outcome = movePip(state.pip, input, state.bolts);
   let pip = outcome.pip;
   let bolts = state.bolts;
-  if (outcome.releasedBolt >= 0) {
+  const hauled = outcome.releasedBolt >= 0; // a lever came down this tick
+  if (hauled) {
     bolts = bolts.map((b, i) => (i === outcome.releasedBolt ? true : b));
     rawPoints += POINTS_PER_BOLT;
   }
 
-  // 2 — existing hazards roll (keep each one's start cell for the crossing check)
-  const rolled: Array<{ h: Hazard; fromFloor: Floor; fromSlot: number }> = [];
-  for (const h of state.hazards) {
-    const n = advanceHazard(h);
-    if (n !== null) rolled.push({ h: n, fromFloor: h.floor, fromSlot: h.slot });
-  }
-
-  // 3 — Bruno's swipe (doc §5.5). The swing arm shows one tick early (the windup
-  //     frame) so the hit is telegraphed, like the barrels. The hit is a miss
-  //     and resets *that* bolt — the one Pip is releasing, or the released
-  //     station he stands on — but never a bolt he just secured this same tick.
+  // 2 — Bruno's swipe (doc §5.5). The swing arm shows one tick early (the windup
+  //     frame) so the hit is telegraphed, like the hazards. It costs a miss and
+  //     knocks a lever back up — the one Pip is hauling, or the last one pulled
+  //     if he is loitering at the console — but never one secured this same tick.
+  //     Resolved before the haul warps Pip away, so the swing still lands.
   let swipeCountdown = state.swipeCountdown - 1;
   let swipe = Math.max(0, state.swipe - 1);
   if (swipeCountdown === 1) {
@@ -217,7 +228,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipe = 2;
     const inReach =
       pip.floor === 4 &&
-      Math.abs(pip.slot - BRUNO_SLOT) <= SWIPE_REACH &&
+      Math.abs(pip.slot - brunoSlot) <= SWIPE_REACH &&
       pip.pose !== "jump" &&
       pip.pose !== "climb";
     if (inReach) {
@@ -226,51 +237,76 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
         const bi = pip.releasingBolt;
         pip = { ...pip, releasing: 0, releasingBolt: -1, pose: "stand" };
         if (bi >= 0) bolts = bolts.map((b, i) => (i === bi ? false : b));
-      } else {
-        const bi = boltIndexAt(pip.slot);
-        if (bi >= 0 && bolts[bi] === true && bi !== outcome.releasedBolt) {
-          bolts = bolts.map((b, i) => (i === bi ? false : b));
-        }
+      } else if (pip.slot === CONSOLE_SLOT) {
+        // knock the last-pulled lever back up (not one secured this tick)
+        const bi = bolts.reduce(
+          (last, b, i) => (b === true && i !== outcome.releasedBolt ? i : last),
+          -1,
+        );
+        if (bi >= 0) bolts = bolts.map((b, i) => (i === bi ? false : b));
       }
     }
   }
 
-  // 4 — collisions: a barrel hits if it ends on Pip's slot, or crossed straight
-  //     through him this tick (same floor, slots exchanged). A jump clears it.
-  const survivors: Hazard[] = [];
-  for (const { h, fromFloor, fromSlot } of rolled) {
-    const crossed =
-      !isAirborne(pip) &&
-      pip.floor === pipFrom.floor &&
-      h.floor === pip.floor &&
-      fromFloor === pip.floor &&
-      fromSlot === pip.slot &&
-      h.slot === pipFrom.slot;
-    if (hazardHits(pip, h) || crossed) misses += 1;
-    else survivors.push(h);
-  }
-
-  // 4b — near misses (doc §5.3): a survivor that rolled onto the slot Pip just
-  //      vacated, or one that passed beneath him mid-jump. This is where the
-  //      points are — the game's answer to the original's reward-for-patience.
+  // The haul's reward: the stage is swept clear of hazards and Pip drops back to
+  // the start for the next climb (doc §5.5).
+  if (hauled) pip = freshPip();
   const pipMoved = pip.slot !== pipFrom.slot || pip.floor !== pipFrom.floor;
+
+  // 3 — hazards roll, and are checked against Pip on every slot they pass
+  //     through. A barrel covers one slot a tick; a chair two, sub-stepped so
+  //     its floor-descent and end-reversal stay right (doc §5.4). A hazard that
+  //     hits (ends on Pip's slot, or crosses straight through him) is a miss and
+  //     is gone; otherwise it survives at its final slot. A survivor that landed
+  //     on the slot Pip just vacated, or passed beneath his jump, is a near miss
+  //     — the primary source of points (doc §5.3).
+  const survivors: Hazard[] = [];
   let nearMisses = 0;
-  for (const h of survivors) {
+  for (const h of hauled ? [] : state.hazards) {
+    let cur: Hazard | null = h;
+    let hit = false;
+    for (let i = 0; i < HAZARD_SPEED[h.kind] && cur !== null; i++) {
+      const from = cur;
+      const next = advanceHazard(from);
+      if (next === null) {
+        cur = null; // rolled off the board
+        break;
+      }
+      const crossed =
+        !isAirborne(pip) &&
+        pip.floor === pipFrom.floor &&
+        next.floor === pip.floor &&
+        from.floor === pip.floor &&
+        from.slot === pip.slot &&
+        next.slot === pipFrom.slot;
+      if (hazardHits(pip, next) || crossed) {
+        hit = true;
+        break;
+      }
+      cur = next;
+    }
+    if (hit) {
+      misses += 1;
+      continue;
+    }
+    if (cur === null) continue;
+    survivors.push(cur);
     const vacated =
-      pipMoved && h.floor === pipFrom.floor && h.slot === pipFrom.slot;
+      pipMoved && cur.floor === pipFrom.floor && cur.slot === pipFrom.slot;
     const beneath =
-      isAirborne(pip) && h.floor === pip.floor && h.slot === pip.slot;
+      isAirborne(pip) && cur.floor === pip.floor && cur.slot === pip.slot;
     if (vacated || beneath) nearMisses += 1;
   }
   rawPoints += nearMisses * NEAR_MISS_POINTS;
 
-  // 5 — spawn: the new barrel appears now but is checked only from next tick, so
-  //     every hazard gets at least one tick of telegraph (doc §5.4).
-  let spawnCountdown = state.spawnCountdown - 1;
-  if (spawnCountdown <= 0) {
-    const [barrel, next] = spawnBarrel(BRUNO_SLOT, rng);
+  // 4 — spawn: the new hazard appears now but is checked only from next tick, so
+  //     every one gets at least a tick of telegraph (doc §5.4). A haul tick
+  //     spawns nothing — the stage just went quiet — and resets the cadence.
+  let spawnCountdown = hauled ? params.hazardCadence : state.spawnCountdown - 1;
+  if (!hauled && spawnCountdown <= 0) {
+    const [hazard, next] = spawnHazard(brunoSlot, state.round, rng);
     rng = next;
-    survivors.push(barrel);
+    survivors.push(hazard);
     spawnCountdown = params.hazardCadence;
   }
 
@@ -321,6 +357,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     pip,
     hazards: survivors,
     bolts,
+    brunoSlot,
+    brunoDir,
     spawnCountdown,
     swipeCountdown,
     swipe,
@@ -353,6 +391,8 @@ function stepCleared(state: GameState): GameState {
     pip: freshPip(),
     hazards: [],
     bolts: state.bolts.map(() => false),
+    brunoSlot: BRUNO_SLOT,
+    brunoDir: 1,
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
     swipe: 0,

@@ -48,10 +48,15 @@ export function renderPanel(
   // 2 — the printed backdrop
   drawBackdrop(ctx, view.screen, pal);
 
-  // 3 — every segment in the atlas, ghosted (--ghost carries its own alpha)
+  // 3 — every segment in the atlas, ghosted (--ghost carries its own alpha).
+  // `noGhost` segments (mirrored left-facing poses, Bruno's transient frames)
+  // are skipped: they carry no silhouette a viewer needs to see coming, and
+  // ghosting them doubles the layer into a smear (see Seg).
   ctx.fillStyle = pal.ghost;
   ctx.globalAlpha = 1;
-  for (const seg of segs) ctx.fill(pathForSeg(seg));
+  for (const seg of segs) {
+    if (seg.noGhost !== true) ctx.fill(pathForSeg(seg));
+  }
   for (const spec of view.texts) drawTextLayer(ctx, spec, false);
 
   // 4 + 5 — the lit subset at --segment, with the battery contrast modifier
