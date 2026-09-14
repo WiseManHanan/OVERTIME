@@ -37,8 +37,10 @@ export const HAZARD_SPEED: Record<HazardKind, 1 | 2> = {
   chair: 2,
 };
 
-/** Chairs join the mix from this round on. */
-export const CHAIR_UNLOCK_ROUND = 2;
+/** Chairs join the mix from this round on (doc §5.4: "chairs from 3" — round 2
+ *  is a barrel-only breather, standing in for the coffee cup this build
+ *  doesn't have yet, before the duck-only, double-speed hazard shows up). */
+export const CHAIR_UNLOCK_ROUND = 3;
 const CHAIR_CHANCE = 0.34;
 
 /**

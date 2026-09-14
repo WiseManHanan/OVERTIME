@@ -34,6 +34,11 @@ describe("hazards (doc §5.4)", () => {
     for (let s = 1; s < 400; s++) {
       expect(spawnHazard(6, 1, seedRng(s))[0].kind).toBe("barrel");
     }
+    // round 2 is a barrel-only breather before the duck-only hazard shows up.
+    expect(CHAIR_UNLOCK_ROUND).toBeGreaterThan(2);
+    for (let s = 1; s < 400; s++) {
+      expect(spawnHazard(6, 2, seedRng(s))[0].kind).toBe("barrel");
+    }
     const kinds = new Set<string>();
     for (let s = 1; s < 400; s++) {
       kinds.add(spawnHazard(6, CHAIR_UNLOCK_ROUND, seedRng(s))[0].kind);
