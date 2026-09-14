@@ -131,15 +131,24 @@ export function freshPip(): Pip {
   };
 }
 
-export function initialState(seed: number, clock: ClockMode = "standard"): GameState {
-  const first = roundParams(1);
+/** `startRound` is a debug/cheat entry point (`?round=N` in main.ts) for
+ *  playtesting a specific round's tuning without climbing there first. Play
+ *  from title still goes through the normal round-speed lookup (stepTitle
+ *  reads `state.round`), so a cheat start behaves exactly like reaching that
+ *  round the ordinary way. */
+export function initialState(
+  seed: number,
+  clock: ClockMode = "standard",
+  startRound = 1,
+): GameState {
+  const first = roundParams(startRound);
   return {
     seed,
     clock,
     tick: 0,
     rng: seedRng(seed),
     phase: "title",
-    round: 1,
+    round: startRound,
     score: 0,
     misses: 0,
     pip: freshPip(),
