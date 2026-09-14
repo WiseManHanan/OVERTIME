@@ -220,7 +220,7 @@ Hazards spawn at Bruno's slot on floor 4 and descend one floor at a time, travel
 |---|---|---|
 | Barrel | low | Rolls straight. The baseline. |
 | Coffee cup | low | Rolls, then leaves a slick slot for 8 ticks; entering it carries Pip one extra slot in his direction of travel. |
-| Office chair | high | Rolls fast (2 slots/tick). Must be ducked, cannot be jumped. |
+| Office chair | high | Rolls fast (2 slots/tick). Must be ducked, cannot be jumped. Eases in at 1 slot/tick through its first two rounds so its unlock round isn't also the first time a player must react to full speed. |
 | Roomba | low | Rolls, reverses direction once at a random slot, then continues. |
 | Filing cabinet | low | Occupies two adjacent slots. Jumping it requires starting from two slots away. |
 | Sofa | both | Fills an entire floor's width. Only survivable by being on a ladder. Announced one tick early by a Steward bell. |

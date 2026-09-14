@@ -34,7 +34,7 @@ import {
   ladderUpAt,
   type Floor,
 } from "./world";
-import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards";
+import { advanceHazard, hazardSpeed, spawnHazard, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
 import {
@@ -199,7 +199,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // see below), then he's here at a round's worth of extra difficulty.
   const nightAwake = state.clock === "night" && state.nightWoken;
   const brunoHere = roundTick >= cp.brunoAwayUntil || nightAwake;
-  const params = roundParams(effectiveRound(state.round, state.clock, state.nightWoken));
+  const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
+  const params = roundParams(effRound);
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -292,18 +293,19 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   // 3 — hazards roll, and are checked against Pip on every slot they pass
-  //     through. A barrel covers one slot a tick; a chair two, sub-stepped so
-  //     its floor-descent and end-reversal stay right (doc §5.4). A hazard that
-  //     hits (ends on Pip's slot, or crosses straight through him) is a miss and
-  //     is gone; otherwise it survives at its final slot. A survivor that landed
-  //     on the slot Pip just vacated, or passed beneath his jump, is a near miss
-  //     — the primary source of points (doc §5.3).
+  //     through. A barrel covers one slot a tick; a chair up to two (ramping in
+  //     by round, see hazardSpeed), sub-stepped so its floor-descent and
+  //     end-reversal stay right (doc §5.4). A hazard that hits (ends on Pip's
+  //     slot, or crosses straight through him) is a miss and is gone; otherwise
+  //     it survives at its final slot. A survivor that landed on the slot Pip
+  //     just vacated, or passed beneath his jump, is a near miss — the primary
+  //     source of points (doc §5.3).
   const survivors: Hazard[] = [];
   let nearMisses = 0;
   for (const h of hauled ? [] : state.hazards) {
     let cur: Hazard | null = h;
     let hit = false;
-    for (let i = 0; i < HAZARD_SPEED[h.kind] && cur !== null; i++) {
+    for (let i = 0; i < hazardSpeed(h.kind, effRound) && cur !== null; i++) {
       const from = cur;
       const next = advanceHazard(from);
       if (next === null) {

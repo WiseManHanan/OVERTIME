@@ -2,8 +2,9 @@
  * Hazards (doc §5.4). Bruno throws two things down the scaffold:
  *
  *   barrel — a *low* hazard. Rolls one slot per tick. Jump it, or step off it.
- *   chair  — a *high* hazard. Rolls *two* slots per tick (the double-step lives
- *            in step.ts). Cannot be jumped; must be ducked. Unlocks from round 2.
+ *   chair  — a *high* hazard. Cannot be jumped; must be ducked. Unlocks from
+ *            round 3 and ramps up to its full two-slots-per-tick roll (the
+ *            double-step lives in step.ts) by CHAIR_FULL_SPEED_ROUND.
  *
  * Either one descends a floor whenever it reaches a floor's end (down the
  * ladder, reversing) or rolls over the floor-2 gap (straight through), and
@@ -31,7 +32,7 @@ export const HAZARD_HEIGHT: Record<HazardKind, "low" | "high"> = {
   chair: "high",
 };
 
-/** Slots a chair covers per tick — the fast one (doc §5.4). */
+/** Slots a chair covers per tick at full speed — the fast one (doc §5.4). */
 export const HAZARD_SPEED: Record<HazardKind, 1 | 2> = {
   barrel: 1,
   chair: 2,
@@ -42,6 +43,21 @@ export const HAZARD_SPEED: Record<HazardKind, 1 | 2> = {
  *  doesn't have yet, before the duck-only, double-speed hazard shows up). */
 export const CHAIR_UNLOCK_ROUND = 3;
 const CHAIR_CHANCE = 0.34;
+
+/** From this round on, a chair hits its full doc-spec speed. Before it, a chair
+ *  still moves at 1 slot/tick — same pace as a barrel, distinguished only by
+ *  being duck-only — so the round it unlocks isn't also the round a player
+ *  first has to react to a hazard that can close two slots inside a single
+ *  ~140ms tick. Full speed is still the steady-state identity; this only
+ *  softens the introduction. */
+export const CHAIR_FULL_SPEED_ROUND = 5;
+
+/** The speed a hazard actually rolls at this round — barrels are always 1;
+ *  chairs ramp from 1 up to their full HAZARD_SPEED.chair (doc §5.4). */
+export function hazardSpeed(kind: HazardKind, round: number): 1 | 2 {
+  if (kind === "barrel") return HAZARD_SPEED.barrel;
+  return round >= CHAIR_FULL_SPEED_ROUND ? HAZARD_SPEED.chair : 1;
+}
 
 /**
  * Spawn a hazard at Bruno's current slot, rolling a seeded-random way. Once
