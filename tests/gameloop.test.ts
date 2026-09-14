@@ -16,6 +16,7 @@ import {
 } from "../src/sim/state";
 import { step } from "../src/sim/step";
 import { CHAIR_FULL_SPEED_ROUND, CHAIR_UNLOCK_ROUND, type Hazard } from "../src/sim/hazards";
+import { roundParams } from "../src/sim/rounds";
 
 type Floor = 1 | 2 | 3 | 4;
 const mkBarrel = (floor: Floor, slot: number, dir: -1 | 1): Hazard => ({
@@ -259,6 +260,16 @@ describe("the title state holds", () => {
     let s = initialState(1);
     for (let i = 0; i < 20; i++) s = step(s, null);
     expect(s.brunoSlot).toBe(BRUNO_SLOT);
+  });
+
+  it("a debug startRound plays out exactly like reaching that round normally", () => {
+    let s = initialState(1, "standard", 5);
+    expect(s.round).toBe(5);
+    s = step(s, "right"); // first move: title -> playing
+    expect(s.phase).toBe("playing");
+    const p = roundParams(5);
+    expect(s.spawnCountdown).toBe(p.hazardCadence);
+    expect(s.swipeCountdown).toBe(p.swipeCadence);
   });
 });
 

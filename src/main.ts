@@ -94,10 +94,19 @@ function playFirst(cues: ReadonlySet<Cue>): void {
   }
 }
 
+// Cheat: ?round=N starts play at round N instead of round 1 — for playtesting
+// a specific round's tuning without climbing there first (e.g. chairs' speed
+// ramp, or the battery, both round-gated). Any junk or missing value is round 1.
+function debugStartRound(): number {
+  const raw = new URLSearchParams(window.location.search).get("round");
+  const n = raw === null ? 1 : Math.floor(Number(raw));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 // A run starts with the wall clock read once (doc §7.1) — resolved here, never
 // inside step().
 function freshRun(): GameState {
-  return initialState(Date.now() >>> 0, resolveClock(new Date()));
+  return initialState(Date.now() >>> 0, resolveClock(new Date()), debugStartRound());
 }
 let state = freshRun();
 
