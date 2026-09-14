@@ -202,8 +202,9 @@ function startLoop(): void {
     while (acc >= tickMs) {
       acc -= tickMs;
       const action = input.drain();
+      const buttonA = input.consumeButtonA();
       const prev = state;
-      if (state.phase === "over" && action === "a") {
+      if (state.phase === "over" && buttonA) {
         state = freshRun(); // a fresh seeded run, clock re-read
       } else {
         state = step(state, action);
