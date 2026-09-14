@@ -34,10 +34,17 @@ import {
   ladderUpAt,
   type Floor,
 } from "./world";
-import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards";
+import { advanceHazard, hazardSpeed, spawnHazard, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
-import { clockParams } from "./clock";
+import {
+  NIGHT_NOISE_DECAY,
+  NIGHT_NOISE_FILL,
+  NIGHT_NOISE_MAX,
+  clockParams,
+  effectiveRound,
+} from "./clock";
+import { batteryDead, hasStuckSegment, nextBattery, pickStuckPose } from "./battery";
 import {
   BOREDOM_START,
   BOREDOM_STALE_FLOOR_TICKS,
@@ -181,14 +188,19 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
     playingSince: state.tick + 1, // round 1 clock windows start now
+    roundClean: true,
   };
 }
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
-  const params = roundParams(state.round);
   const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
   const roundTick = state.tick - state.playingSince; // ticks into *this* round
-  const brunoHere = roundTick >= cp.brunoAwayUntil; // off to lunch / asleep otherwise
+  // NIGHT: asleep until the noise meter fills (state.nightWoken, set last tick —
+  // see below), then he's here at a round's worth of extra difficulty.
+  const nightAwake = state.clock === "night" && state.nightWoken;
+  const brunoHere = roundTick >= cp.brunoAwayUntil || nightAwake;
+  const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
+  const params = roundParams(effRound);
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -263,19 +275,37 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   if (hauled) pip = freshPip();
   const pipMoved = pip.slot !== pipFrom.slot || pip.floor !== pipFrom.floor;
 
+  // NIGHT only: Bruno is asleep, and stays that way as long as Pip moves
+  // carefully. Two moves in a row builds noise; standing still (or ducking)
+  // lets it settle. A full meter wakes him for the rest of the round, at a
+  // round's worth of extra difficulty (doc §7.1) — brunoHere above already
+  // reflects *last* tick's wake state, so the bump lands one tick after the
+  // meter actually fills, like a telegraph.
+  const moveStreak = pipMoved ? state.moveStreak + 1 : 0;
+  let nightNoise = state.nightNoise;
+  let nightWoken = state.nightWoken;
+  if (state.clock === "night" && !nightWoken) {
+    nightNoise =
+      moveStreak >= 2
+        ? Math.min(NIGHT_NOISE_MAX, nightNoise + NIGHT_NOISE_FILL)
+        : Math.max(0, nightNoise - NIGHT_NOISE_DECAY);
+    if (nightNoise >= NIGHT_NOISE_MAX) nightWoken = true;
+  }
+
   // 3 — hazards roll, and are checked against Pip on every slot they pass
-  //     through. A barrel covers one slot a tick; a chair two, sub-stepped so
-  //     its floor-descent and end-reversal stay right (doc §5.4). A hazard that
-  //     hits (ends on Pip's slot, or crosses straight through him) is a miss and
-  //     is gone; otherwise it survives at its final slot. A survivor that landed
-  //     on the slot Pip just vacated, or passed beneath his jump, is a near miss
-  //     — the primary source of points (doc §5.3).
+  //     through. A barrel covers one slot a tick; a chair up to two (ramping in
+  //     by round, see hazardSpeed), sub-stepped so its floor-descent and
+  //     end-reversal stay right (doc §5.4). A hazard that hits (ends on Pip's
+  //     slot, or crosses straight through him) is a miss and is gone; otherwise
+  //     it survives at its final slot. A survivor that landed on the slot Pip
+  //     just vacated, or passed beneath his jump, is a near miss — the primary
+  //     source of points (doc §5.3).
   const survivors: Hazard[] = [];
   let nearMisses = 0;
   for (const h of hauled ? [] : state.hazards) {
     let cur: Hazard | null = h;
     let hit = false;
-    for (let i = 0; i < HAZARD_SPEED[h.kind] && cur !== null; i++) {
+    for (let i = 0; i < hazardSpeed(h.kind, effRound) && cur !== null; i++) {
       const from = cur;
       const next = advanceHazard(from);
       if (next === null) {
@@ -349,6 +379,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const stewardAsleep = nextAsleep(state.stewardAsleep, boredom);
 
   // 7 — resolve the round
+  const tookMiss = misses > state.misses; // any miss this tick (pre-clamp)
   misses = Math.min(misses, MISSES_ALLOWED); // two hits in one tick still ends at 3
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
@@ -357,7 +388,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   } else if (bolts.every((b) => b)) {
     phase = "cleared";
     clearedCountdown = ROUND_CLEARED_TICKS;
-    rawPoints += POINTS_PER_ROUND_CLEAR * cp.clearMult; // NIGHT pays double here
+    // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
+    const clearMult = state.clock === "night" && nightWoken ? 1 : cp.clearMult;
+    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult;
   }
 
   const score =
@@ -379,10 +412,14 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipeCountdown,
     swipe,
     clearedCountdown,
+    moveStreak,
+    nightNoise,
+    nightWoken,
     boredom,
     stewardAsleep,
     nearMisses: state.nearMisses + nearMisses,
     ticksSinceFloorChange,
+    roundClean: state.roundClean && !tookMiss,
   };
 }
 
@@ -397,13 +434,43 @@ function stepCleared(state: GameState): GameState {
       swipe: Math.max(0, state.swipe - 1),
     };
   }
+  // The battery drains between rounds once it has started failing (doc §7.3).
+  const battery = nextBattery(
+    state.battery,
+    state.round,
+    state.clock,
+    state.roundClean,
+  );
+  if (batteryDead(battery)) {
+    // A flat console is a legitimate end to the run — the score stands.
+    return { ...state, tick: state.tick + 1, phase: "over", battery: 0 };
+  }
+
   const round = state.round + 1;
   const params = roundParams(round);
+
+  // A stuck pose (dark) and a phantom (lit) are re-rolled for the new round.
+  let rng = state.rng;
+  let stuckDark = null;
+  let stuckLit = null;
+  if (hasStuckSegment(battery)) {
+    const [d, r1] = pickStuckPose(rng);
+    const [l, r2] = pickStuckPose(r1);
+    rng = r2;
+    stuckDark = d;
+    stuckLit = l;
+  }
+
   return {
     ...state,
     tick: state.tick + 1,
     phase: "playing",
     round,
+    rng,
+    battery,
+    roundClean: true,
+    stuckDark,
+    stuckLit,
     pip: freshPip(),
     hazards: [],
     bolts: state.bolts.map(() => false),
@@ -417,5 +484,8 @@ function stepCleared(state: GameState): GameState {
     stewardAsleep: false,
     ticksSinceFloorChange: 0,
     playingSince: state.tick + 1, // this round's clock windows start now
+    moveStreak: 0,
+    nightNoise: 0,
+    nightWoken: false, // a fresh round is a fresh chance to sneak past him
   };
 }

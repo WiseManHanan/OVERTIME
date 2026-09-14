@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  CHAIR_FULL_SPEED_ROUND,
   CHAIR_UNLOCK_ROUND,
   HAZARD_HEIGHT,
   HAZARD_SPEED,
   advanceHazard,
+  hazardSpeed,
   spawnHazard,
   type Hazard,
 } from "../src/sim/hazards";
@@ -34,6 +36,11 @@ describe("hazards (doc §5.4)", () => {
     for (let s = 1; s < 400; s++) {
       expect(spawnHazard(6, 1, seedRng(s))[0].kind).toBe("barrel");
     }
+    // round 2 is a barrel-only breather before the duck-only hazard shows up.
+    expect(CHAIR_UNLOCK_ROUND).toBeGreaterThan(2);
+    for (let s = 1; s < 400; s++) {
+      expect(spawnHazard(6, 2, seedRng(s))[0].kind).toBe("barrel");
+    }
     const kinds = new Set<string>();
     for (let s = 1; s < 400; s++) {
       kinds.add(spawnHazard(6, CHAIR_UNLOCK_ROUND, seedRng(s))[0].kind);
@@ -47,6 +54,20 @@ describe("hazards (doc §5.4)", () => {
     expect(HAZARD_HEIGHT.chair).toBe("high");
     expect(HAZARD_SPEED.barrel).toBe(1);
     expect(HAZARD_SPEED.chair).toBe(2);
+  });
+
+  it("a chair eases into its full speed instead of hitting it the round it unlocks", () => {
+    // Barrels are always the same pace, at any round.
+    expect(hazardSpeed("barrel", 1)).toBe(1);
+    expect(hazardSpeed("barrel", CHAIR_FULL_SPEED_ROUND)).toBe(1);
+
+    // A chair moves at a barrel's pace through its introduction...
+    for (let r = CHAIR_UNLOCK_ROUND; r < CHAIR_FULL_SPEED_ROUND; r++) {
+      expect(hazardSpeed("chair", r)).toBe(1);
+    }
+    // ...then hits the doc-spec full speed from CHAIR_FULL_SPEED_ROUND on.
+    expect(hazardSpeed("chair", CHAIR_FULL_SPEED_ROUND)).toBe(HAZARD_SPEED.chair);
+    expect(hazardSpeed("chair", CHAIR_FULL_SPEED_ROUND + 3)).toBe(HAZARD_SPEED.chair);
   });
 
   it("rolls one slot per sub-step in its direction", () => {

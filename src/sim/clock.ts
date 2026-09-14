@@ -28,13 +28,15 @@ export interface ClockParams {
   speed: number;
   /** Score multiplier on every point awarded (OVERTIME: all points doubled). */
   points: number;
-  /** Extra multiplier on the round-clear bonus only (NIGHT: clearing before he
-   *  wakes doubles the payout — here, all round, since he never wakes). */
+  /** Extra multiplier on the round-clear bonus, on top of `points` (NIGHT:
+   *  clearing before Bruno wakes doubles it — step.ts turns this off once he
+   *  has, via the noise meter below). */
   clearMult: number;
   /** Boredom-fill multiplier (SLUMP: everyone wants it over with). */
   boredomRate: number;
   /** Ticks into the round for which Bruno is off the platform — no pacing, no
-   *  swipe, no throws (LUNCH: out to lunch; NIGHT: asleep all round). */
+   *  swipe, no throws (LUNCH: out to lunch; NIGHT: asleep until woken — see
+   *  the noise meter constants below, step.ts applies those, not this field). */
   brunoAwayUntil: number;
   /** Ticks into the round Bruno paces at half rate (MORNING: not a morning
    *  person). */
@@ -42,6 +44,20 @@ export interface ClockParams {
 }
 
 const AWAY_ALL_ROUND = 1_000_000;
+
+/** NIGHT's noise meter (doc §7.1): two Pip moves in a row start filling it;
+ *  standing still (or ducking) lets it settle. A full meter wakes Bruno for
+ *  the rest of the round, at a round's worth of extra difficulty. */
+export const NIGHT_NOISE_MAX = 100;
+export const NIGHT_NOISE_FILL = 12;
+export const NIGHT_NOISE_DECAY = 8;
+
+/** The round difficulty actually in effect — hazard/swipe cadence *and* the
+ *  real-time tick speed all read this, not `round` directly, so NIGHT's
+ *  post-wake bump (doc §7.1) lands on every one of them, not just some. */
+export function effectiveRound(round: number, clock: ClockMode, nightWoken: boolean): number {
+  return clock === "night" && nightWoken ? round + 1 : round;
+}
 
 const PARAMS: Record<ClockMode, ClockParams> = {
   night: { label: "NIGHT", speed: 1.0, points: 1.0, clearMult: 2.0, boredomRate: 1.0, brunoAwayUntil: AWAY_ALL_ROUND, brunoSlowUntil: 0 },

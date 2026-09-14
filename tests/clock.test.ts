@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { clockParams, resolveClock, type ClockMode } from "../src/sim/clock";
+import { clockParams, effectiveRound, resolveClock, type ClockMode } from "../src/sim/clock";
 import { initialState, type GameState } from "../src/sim/state";
 import { step } from "../src/sim/step";
+import { roundParams } from "../src/sim/rounds";
 import type { Hazard } from "../src/sim/hazards";
 
 const at = (h: number): Date => new Date(2026, 8, 10, h, 30, 0);
@@ -103,5 +104,83 @@ describe("clock modes bend the run (doc §7.1)", () => {
     let s = quiet("lunch", { round: 3, tick: 5000, playingSince: 5000, spawnCountdown: 1 });
     for (let i = 0; i < 30; i++) s = step(s, null);
     expect(s.hazards.length).toBe(0); // still within this round's 60-tick window
+  });
+});
+
+describe("NIGHT: the noise meter (doc §7.1)", () => {
+  it("standing still costs nothing; a single move doesn't fill it either", () => {
+    let s = quiet("night");
+    s = step(s, null);
+    expect(s.nightNoise).toBe(0);
+    s = step(s, "right"); // one move — not "two in a row" yet
+    expect(s.nightNoise).toBe(0);
+    expect(s.nightWoken).toBe(false);
+  });
+
+  it("two moves in a row start filling it; standing still lets it settle", () => {
+    let s = quiet("night", { pip: { ...quiet("night").pip, floor: 1, slot: 0 } });
+    s = step(s, "right"); // 1st move of the streak
+    s = step(s, "right"); // 2nd — the meter starts filling
+    expect(s.nightNoise).toBeGreaterThan(0);
+    const filled = s.nightNoise;
+    s = step(s, "down"); // duck: no movement, breaks the streak
+    expect(s.nightNoise).toBeLessThan(filled);
+  });
+
+  it("a full meter wakes Bruno; a fresh round is a fresh chance to sneak past him", () => {
+    let s = quiet("night", { pip: { ...quiet("night").pip, floor: 1, slot: 0 } });
+    const moves = ["right", "right", "right", "right", "right", "right", "right", "right", "right", "left"] as const;
+    for (const m of moves) s = step(s, m);
+    expect(s.nightNoise).toBe(100);
+    expect(s.nightWoken).toBe(true);
+
+    // clear the round (all four holders already down) and check the reset
+    s = {
+      ...s,
+      phase: "cleared",
+      clearedCountdown: 1,
+      bolts: [true, true, true, true],
+    };
+    s = step(s, null);
+    expect(s.phase).toBe("playing");
+    expect(s.round).toBe(2);
+    expect(s.nightWoken).toBe(false);
+    expect(s.nightNoise).toBe(0);
+  });
+
+  it("once woken, hazards resume at a round's worth of extra difficulty", () => {
+    let s = quiet("night", { nightWoken: true, spawnCountdown: 1 });
+    s = step(s, null);
+    expect(s.hazards.some((h) => h.floor === 4)).toBe(true); // he's throwing again
+    expect(s.spawnCountdown).toBe(roundParams(s.round + 1).hazardCadence);
+  });
+
+  it("the double clear bonus only applies while he's still asleep", () => {
+    const clearScore = (woken: boolean): number => {
+      let s = quiet("night", {
+        bolts: [true, true, true, false],
+        boredom: 70,
+        nightWoken: woken,
+        pip: { ...quiet("night").pip, floor: 4, slot: 8, releasing: 1, releasingBolt: 3 },
+      });
+      s = step(s, null);
+      expect(s.phase).toBe("cleared");
+      return s.score;
+    };
+    expect(clearScore(false)).toBeGreaterThan(clearScore(true));
+  });
+});
+
+describe("effectiveRound (doc §7.1)", () => {
+  it("is the plain round outside NIGHT, or before Bruno has woken", () => {
+    expect(effectiveRound(5, "standard", false)).toBe(5);
+    expect(effectiveRound(5, "overtime", false)).toBe(5);
+    expect(effectiveRound(5, "night", false)).toBe(5);
+  });
+
+  it("bumps by one once NIGHT's noise meter has woken him — every reader of it agrees", () => {
+    // hazard/swipe cadence (step.ts) and the real-time tick speed (main.ts)
+    // both key off this single function, so they can't drift out of step.
+    expect(effectiveRound(5, "night", true)).toBe(6);
   });
 });

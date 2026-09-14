@@ -13,6 +13,11 @@ import type { InputAction } from "../sim/step";
 export interface InputSource {
   /** The action for this tick boundary, or `null` for an idle tick. */
   drain(): InputAction | null;
+  /** Whether the drawn A button — pointer/touch only, no keyboard — was
+   *  pressed since the last call. For the GAME OVER screen's restart, which is
+   *  meant to answer only the physical A button, not any of its in-game
+   *  keyboard stand-ins (Space, Z). */
+  consumeButtonA(): boolean;
   dispose(): void;
 }
 
@@ -35,6 +40,7 @@ const HOLD_REPEAT: readonly InputAction[] = ["left", "right", "up", "down"];
 export function createInput(shell: ShellRefs): InputSource {
   let buffered: InputAction | null = null;
   const held = new Set<InputAction>();
+  let buttonAPressed = false;
 
   const press = (a: InputAction): void => {
     buffered = a;
@@ -93,6 +99,14 @@ export function createInput(shell: ShellRefs): InputSource {
   bindButton(shell.dpad.down, "down");
   bindButton(shell.a, "a");
 
+  // The drawn A button, and only it, also sets a dedicated flag — separate
+  // from the shared "a" buffer keyboard stand-ins feed too.
+  const onButtonADown = (): void => {
+    buttonAPressed = true;
+  };
+  shell.a.addEventListener("pointerdown", onButtonADown);
+  unbinders.push(() => shell.a.removeEventListener("pointerdown", onButtonADown));
+
   return {
     drain(): InputAction | null {
       if (buffered !== null) {
@@ -104,6 +118,11 @@ export function createInput(shell: ShellRefs): InputSource {
         if (held.has(a)) return a;
       }
       return null;
+    },
+    consumeButtonA(): boolean {
+      const p = buttonAPressed;
+      buttonAPressed = false;
+      return p;
     },
     dispose(): void {
       window.removeEventListener("keydown", onKeyDown);

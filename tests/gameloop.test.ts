@@ -15,7 +15,7 @@ import {
   type GameState,
 } from "../src/sim/state";
 import { step } from "../src/sim/step";
-import type { Hazard } from "../src/sim/hazards";
+import { CHAIR_FULL_SPEED_ROUND, CHAIR_UNLOCK_ROUND, type Hazard } from "../src/sim/hazards";
 
 type Floor = 1 | 2 | 3 | 4;
 const mkBarrel = (floor: Floor, slot: number, dir: -1 | 1): Hazard => ({
@@ -289,13 +289,23 @@ describe("Bruno paces his girder (doc §5.5)", () => {
     expect(spawned?.slot).toBe(s.brunoSlot);
   });
 
-  it("a chair covers two slots a tick (doc §5.4)", () => {
+  it("a chair covers two slots a tick once at full speed (doc §5.4)", () => {
     let s = quietPlaying({
+      round: CHAIR_FULL_SPEED_ROUND,
       hazards: [{ kind: "chair", floor: 3, slot: 2, dir: 1 }],
     });
     s = step(s, null);
     expect(s.hazards[0]?.kind).toBe("chair");
     expect(s.hazards[0]?.slot).toBe(4); // 2 -> 3 -> 4
+  });
+
+  it("a chair still covers one slot a tick before it ramps up to full speed", () => {
+    let s = quietPlaying({
+      round: CHAIR_UNLOCK_ROUND,
+      hazards: [{ kind: "chair", floor: 3, slot: 2, dir: 1 }],
+    });
+    s = step(s, null);
+    expect(s.hazards[0]?.slot).toBe(3); // 2 -> 3, not 4
   });
 
   it("the platform stays whole — Bruno paces his full beat however many holders are gone", () => {

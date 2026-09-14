@@ -5,6 +5,7 @@
  */
 import type { GameState } from "../sim/state";
 import { ROUND_CLEARED_TICKS } from "../sim/state";
+import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import type { Screen } from "./types";
@@ -29,7 +30,15 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const live = state.phase !== "over";
 
   if (live && floorScreen(p.floor) === screen) {
-    lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
+    // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
+    if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
+      lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
+    }
+  }
+  // ...and a phantom pose stuck lit where nobody is (doc §7.3).
+  if (live && state.stuckLit && floorScreen(state.stuckLit.f) === screen) {
+    const g = state.stuckLit;
+    lit.add(`pip.f${g.f}.s${g.s}.${g.pose}.r`);
   }
 
   if (live) {

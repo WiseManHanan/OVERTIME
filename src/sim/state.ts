@@ -12,6 +12,7 @@ import { seedRng, type RngState } from "./rng";
 import { roundParams } from "./rounds";
 import { BOREDOM_START } from "./scoring";
 import type { ClockMode } from "./clock";
+import type { StuckPose } from "./battery";
 import type { Hazard } from "./hazards";
 
 export type Facing = -1 | 1;
@@ -77,6 +78,23 @@ export interface GameState {
    *  "first N ticks of the round" window (doc §7.1) is measured from the round,
    *  not from run start. */
   playingSince: number;
+  /** Console charge, 1..0 (doc §7.3). Drains from round 6 (4 in OVERTIME);
+   *  at 0 the run ends. */
+  battery: number;
+  /** No miss taken so far this round — feeds the battery's clean-round bonus. */
+  roundClean: boolean;
+  /** While the battery is low: a Pip pose that won't light (he vanishes in it)
+   *  and a phantom pose that stays lit. Re-rolled each round; null otherwise. */
+  stuckDark: StuckPose | null;
+  stuckLit: StuckPose | null;
+  /** Consecutive ticks Pip has moved (any floor/slot change); 0 the instant he
+   *  stops. Feeds NIGHT's noise meter. */
+  moveStreak: number;
+  /** NIGHT only (doc §7.1): fills while Pip moves two ticks running, settles
+   *  while he holds still. Meaningless once `nightWoken`. */
+  nightNoise: number;
+  /** NIGHT only: the meter filled and Bruno is up for the rest of the round. */
+  nightWoken: boolean;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -138,6 +156,13 @@ export function initialState(seed: number, clock: ClockMode = "standard"): GameS
     nearMisses: 0,
     ticksSinceFloorChange: 0,
     playingSince: 0,
+    battery: 1,
+    roundClean: true,
+    stuckDark: null,
+    stuckLit: null,
+    moveStreak: 0,
+    nightNoise: 0,
+    nightWoken: false,
   };
 }
 

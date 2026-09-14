@@ -48,11 +48,14 @@ export interface Beeper {
   /** Resume/create the AudioContext — call from a user-gesture handler. */
   resume(): void;
   setMuted(muted: boolean): void;
+  /** Frequency multiplier for the whole voice — the low-battery detune (§4.5). */
+  setDetune(mult: number): void;
   readonly muted: boolean;
 }
 
 export function createBeeper(initialMuted: boolean): Beeper {
   let muted = initialMuted;
+  let detune = 1;
   let ctx: AudioContext | null = null;
   let osc: OscillatorNode | null = null;
   let gain: GainNode | null = null;
@@ -94,6 +97,10 @@ export function createBeeper(initialMuted: boolean): Beeper {
       }
     },
 
+    setDetune(mult: number): void {
+      detune = mult > 0 ? mult : 1;
+    },
+
     play(cue: Cue): void {
       if (muted) return;
       ensure();
@@ -108,7 +115,7 @@ export function createBeeper(initialMuted: boolean): Beeper {
       gain.gain.setValueAtTime(0.0001, t);
       for (const [freq, ms] of SEQUENCES[cue]) {
         const dur = ms / 1000;
-        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.setValueAtTime(freq * detune, t);
         gain.gain.setValueAtTime(0.0001, t);
         gain.gain.linearRampToValueAtTime(PEAK, t + ATTACK);
         gain.gain.setValueAtTime(PEAK, t + Math.max(ATTACK, dur - RELEASE));

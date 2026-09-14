@@ -83,6 +83,15 @@ body {
   -webkit-user-select: none;
 }
 
+/* The failing console (doc §7.3): the whole shell sags, then goes dark. No
+   transition — motion here is discrete by design, like everything else. */
+.shell.dying {
+  filter: brightness(0.92) saturate(0.8) contrast(0.96);
+}
+.shell.dead {
+  filter: brightness(0.5) saturate(0.35) contrast(0.9);
+}
+
 .screens {
   display: flex;
   flex-direction: column;
