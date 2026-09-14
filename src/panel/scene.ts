@@ -8,6 +8,7 @@ import { ROUND_CLEARED_TICKS } from "../sim/state";
 import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
+import { CONCESSION_CARDS } from "../sim/grievance";
 import type { Screen } from "./types";
 import type { TextSpec } from "./text";
 import { PANEL_W } from "./dims";
@@ -16,6 +17,8 @@ export interface Scene {
   lit: ReadonlySet<string>;
   texts: readonly TextSpec[];
 }
+
+const CARD_BY_ID = new Map(CONCESSION_CARDS.map((c) => [c.id, c]));
 
 const TITLE_TEXTS: readonly TextSpec[] = [
   { text: "OVERTIME", x: PANEL_W / 2, y: 7, cell: 13, kind: "seg14", align: "center" },
@@ -53,6 +56,13 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       // with it, across the ROUND CLEARED window (doc §5.5).
       const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
       lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 5)))}`);
+    } else if (state.phase === "mediation") {
+      // He stops pacing and sits down right where he was — the platform holds
+      // (doc §7.2: the interlude replaces the round's usual collapse, since
+      // he stopped it before the platform tipped).
+      lit.add(`bruno.sit.s${state.brunoSlot}`);
+      lit.add("bruno.platform");
+      lit.add("gantry");
     } else {
       const face = state.brunoDir === 1 ? "r" : "l";
       const pose = state.swipe > 0 ? "swipe" : "pace";
@@ -79,11 +89,24 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
     }
+
+    if (state.phase === "mediation") {
+      // Bruno's sincere, specific complaint behind the card currently
+      // highlighted — "the comedy is in his being right" (doc §7.2).
+      const chosen = state.mediationCards[state.mediationSelected];
+      const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
+      if (card) {
+        texts.push({ text: card.grievance, x: PANEL_W / 2, y: 28, cell: 5, kind: "seg14", align: "center" });
+      }
+    }
   }
 
   if (screen === "lower") {
-    // The Steward is always on his mark; his pose tracks the boredom meter.
-    lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+    // The Steward is always on his mark; his pose tracks the boredom meter —
+    // except during mediation, where he's presenting cards, not judging play.
+    lit.add(
+      `steward.${state.phase === "mediation" ? "idle" : stewardMood(state.boredom, state.stewardAsleep)}`,
+    );
 
     if (state.phase === "playing" || state.phase === "cleared") {
       const filled = Math.round((state.boredom / BOREDOM_MAX) * 10);
@@ -108,6 +131,30 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       texts.push({ text: "SCORE", x: PANEL_W / 2, y: 34, cell: 6, kind: "seg14", align: "center" });
       texts.push({ text: String(state.score), x: PANEL_W / 2, y: 44, cell: 14, kind: "seg7", align: "center" });
       texts.push({ text: "PRESS A", x: PANEL_W / 2, y: 68, cell: 7, kind: "seg14", align: "center" });
+    } else if (state.phase === "mediation") {
+      // The Steward presents up to three concession cards; LEFT/RIGHT cycles
+      // the highlight (the bigger cell), A picks it (doc §7.2).
+      texts.push({ text: "MEDIATION", x: PANEL_W / 2, y: 4, cell: 7, kind: "seg14", align: "center" });
+      state.mediationCards.forEach((id, i) => {
+        const card = CARD_BY_ID.get(id);
+        if (!card) return;
+        const on = i === state.mediationSelected;
+        texts.push({
+          text: card.title,
+          x: 6,
+          y: 18 + i * 12,
+          cell: on ? 7 : 5,
+          kind: "seg14",
+          align: "left",
+        });
+      });
+      const chosen = state.mediationCards[state.mediationSelected];
+      const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
+      if (card) {
+        texts.push({ text: card.youGain, x: 6, y: 60, cell: 5, kind: "seg14", align: "left" });
+        texts.push({ text: card.brunoGains, x: 6, y: 70, cell: 5, kind: "seg14", align: "left" });
+      }
+      texts.push({ text: "LEFT RIGHT A", x: PANEL_W / 2, y: 86, cell: 5, kind: "seg14", align: "center" });
     }
   }
 
