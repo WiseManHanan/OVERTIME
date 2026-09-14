@@ -37,7 +37,12 @@ import {
 import { HAZARD_SPEED, advanceHazard, spawnHazard, type Hazard } from "./hazards";
 import { hazardHits } from "./collision";
 import { roundParams } from "./rounds";
-import { clockParams } from "./clock";
+import {
+  NIGHT_NOISE_DECAY,
+  NIGHT_NOISE_FILL,
+  NIGHT_NOISE_MAX,
+  clockParams,
+} from "./clock";
 import { batteryDead, hasStuckSegment, nextBattery, pickStuckPose } from "./battery";
 import {
   BOREDOM_START,
@@ -187,10 +192,13 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
 }
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
-  const params = roundParams(state.round);
   const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
   const roundTick = state.tick - state.playingSince; // ticks into *this* round
-  const brunoHere = roundTick >= cp.brunoAwayUntil; // off to lunch / asleep otherwise
+  // NIGHT: asleep until the noise meter fills (state.nightWoken, set last tick —
+  // see below), then he's here at a round's worth of extra difficulty.
+  const nightAwake = state.clock === "night" && state.nightWoken;
+  const brunoHere = roundTick >= cp.brunoAwayUntil || nightAwake;
+  const params = nightAwake ? roundParams(state.round + 1) : roundParams(state.round);
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -264,6 +272,23 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // the start for the next climb (doc §5.5).
   if (hauled) pip = freshPip();
   const pipMoved = pip.slot !== pipFrom.slot || pip.floor !== pipFrom.floor;
+
+  // NIGHT only: Bruno is asleep, and stays that way as long as Pip moves
+  // carefully. Two moves in a row builds noise; standing still (or ducking)
+  // lets it settle. A full meter wakes him for the rest of the round, at a
+  // round's worth of extra difficulty (doc §7.1) — brunoHere above already
+  // reflects *last* tick's wake state, so the bump lands one tick after the
+  // meter actually fills, like a telegraph.
+  const moveStreak = pipMoved ? state.moveStreak + 1 : 0;
+  let nightNoise = state.nightNoise;
+  let nightWoken = state.nightWoken;
+  if (state.clock === "night" && !nightWoken) {
+    nightNoise =
+      moveStreak >= 2
+        ? Math.min(NIGHT_NOISE_MAX, nightNoise + NIGHT_NOISE_FILL)
+        : Math.max(0, nightNoise - NIGHT_NOISE_DECAY);
+    if (nightNoise >= NIGHT_NOISE_MAX) nightWoken = true;
+  }
 
   // 3 — hazards roll, and are checked against Pip on every slot they pass
   //     through. A barrel covers one slot a tick; a chair two, sub-stepped so
@@ -360,7 +385,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   } else if (bolts.every((b) => b)) {
     phase = "cleared";
     clearedCountdown = ROUND_CLEARED_TICKS;
-    rawPoints += POINTS_PER_ROUND_CLEAR * cp.clearMult; // NIGHT pays double here
+    // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
+    const clearMult = state.clock === "night" && nightWoken ? 1 : cp.clearMult;
+    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult;
   }
 
   const score =
@@ -382,6 +409,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipeCountdown,
     swipe,
     clearedCountdown,
+    moveStreak,
+    nightNoise,
+    nightWoken,
     boredom,
     stewardAsleep,
     nearMisses: state.nearMisses + nearMisses,
@@ -451,5 +481,8 @@ function stepCleared(state: GameState): GameState {
     stewardAsleep: false,
     ticksSinceFloorChange: 0,
     playingSince: state.tick + 1, // this round's clock windows start now
+    moveStreak: 0,
+    nightNoise: 0,
+    nightWoken: false, // a fresh round is a fresh chance to sneak past him
   };
 }

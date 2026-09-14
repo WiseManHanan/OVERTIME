@@ -87,6 +87,14 @@ export interface GameState {
    *  and a phantom pose that stays lit. Re-rolled each round; null otherwise. */
   stuckDark: StuckPose | null;
   stuckLit: StuckPose | null;
+  /** Consecutive ticks Pip has moved (any floor/slot change); 0 the instant he
+   *  stops. Feeds NIGHT's noise meter. */
+  moveStreak: number;
+  /** NIGHT only (doc §7.1): fills while Pip moves two ticks running, settles
+   *  while he holds still. Meaningless once `nightWoken`. */
+  nightNoise: number;
+  /** NIGHT only: the meter filled and Bruno is up for the rest of the round. */
+  nightWoken: boolean;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -152,6 +160,9 @@ export function initialState(seed: number, clock: ClockMode = "standard"): GameS
     roundClean: true,
     stuckDark: null,
     stuckLit: null,
+    moveStreak: 0,
+    nightNoise: 0,
+    nightWoken: false,
   };
 }
 

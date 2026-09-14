@@ -107,7 +107,13 @@ function syncHints(): void {
   const inTitle = state.phase === "title";
   shell.dpad.left.classList.toggle("hint", inTitle);
   shell.dpad.right.classList.toggle("hint", inTitle);
-  shell.statusStrip.textContent = clockParams(state.clock).label;
+  // NIGHT: the strip is the only readout of the noise meter, so it has to say
+  // whether sneaking is still working (doc §7.1).
+  const label = clockParams(state.clock).label;
+  shell.statusStrip.textContent =
+    state.clock === "night" && state.phase === "playing"
+      ? `${label} · ${state.nightWoken ? "AWAKE" : "QUIET"}`
+      : label;
 }
 syncHints();
 
