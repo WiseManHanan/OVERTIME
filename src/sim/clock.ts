@@ -52,6 +52,13 @@ export const NIGHT_NOISE_MAX = 100;
 export const NIGHT_NOISE_FILL = 12;
 export const NIGHT_NOISE_DECAY = 8;
 
+/** The round difficulty actually in effect — hazard/swipe cadence *and* the
+ *  real-time tick speed all read this, not `round` directly, so NIGHT's
+ *  post-wake bump (doc §7.1) lands on every one of them, not just some. */
+export function effectiveRound(round: number, clock: ClockMode, nightWoken: boolean): number {
+  return clock === "night" && nightWoken ? round + 1 : round;
+}
+
 const PARAMS: Record<ClockMode, ClockParams> = {
   night: { label: "NIGHT", speed: 1.0, points: 1.0, clearMult: 2.0, boredomRate: 1.0, brunoAwayUntil: AWAY_ALL_ROUND, brunoSlowUntil: 0 },
   morning: { label: "MORNING", speed: 1.0, points: 1.0, clearMult: 1.0, boredomRate: 1.0, brunoAwayUntil: 0, brunoSlowUntil: 30 },

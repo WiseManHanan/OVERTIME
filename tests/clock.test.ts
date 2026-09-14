@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clockParams, resolveClock, type ClockMode } from "../src/sim/clock";
+import { clockParams, effectiveRound, resolveClock, type ClockMode } from "../src/sim/clock";
 import { initialState, type GameState } from "../src/sim/state";
 import { step } from "../src/sim/step";
 import { roundParams } from "../src/sim/rounds";
@@ -168,5 +168,19 @@ describe("NIGHT: the noise meter (doc §7.1)", () => {
       return s.score;
     };
     expect(clearScore(false)).toBeGreaterThan(clearScore(true));
+  });
+});
+
+describe("effectiveRound (doc §7.1)", () => {
+  it("is the plain round outside NIGHT, or before Bruno has woken", () => {
+    expect(effectiveRound(5, "standard", false)).toBe(5);
+    expect(effectiveRound(5, "overtime", false)).toBe(5);
+    expect(effectiveRound(5, "night", false)).toBe(5);
+  });
+
+  it("bumps by one once NIGHT's noise meter has woken him — every reader of it agrees", () => {
+    // hazard/swipe cadence (step.ts) and the real-time tick speed (main.ts)
+    // both key off this single function, so they can't drift out of step.
+    expect(effectiveRound(5, "night", true)).toBe(6);
   });
 });

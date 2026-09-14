@@ -15,7 +15,7 @@ import { sceneFor } from "./panel/scene";
 import { initialState, type GameState } from "./sim/state";
 import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
-import { clockParams, resolveClock } from "./sim/clock";
+import { clockParams, effectiveRound, resolveClock } from "./sim/clock";
 import { batteryContrast, batteryDetune, isBlackoutTick } from "./sim/battery";
 import { stewardMood } from "./sim/scoring";
 import { createBeeper, type Cue } from "./audio/beeper";
@@ -147,12 +147,16 @@ function ctxFor(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 
 function viewFor(screen: Screen): PanelView {
   const scene = sceneFor(state, screen);
+  // GAME OVER is a bare readout (scene.ts) — the "over" trap state keeps
+  // ticking forever with no input, so a blackout tick must never land on it
+  // and hide the final score.
+  const blackout = state.phase !== "over" && isBlackoutTick(state.battery, state.tick);
   return {
     screen,
     lit: scene.lit,
     texts: scene.texts,
     contrast: batteryContrast(state.battery),
-    blackout: isBlackoutTick(state.battery, state.tick),
+    blackout,
   };
 }
 
@@ -185,9 +189,12 @@ function startLoop(): void {
     last = now;
 
     // The round speed table (doc §6.1) and the time-of-day mode (doc §7.1) both
-    // scale the tick rate, not the sim.
+    // scale the tick rate, not the sim. Once NIGHT's noise meter has woken
+    // Bruno, effectiveRound reads the same "one round harder" the hazard and
+    // swipe cadences already do (step.ts), so the whole round speeds up too.
+    const round = effectiveRound(state.round, state.clock, state.nightWoken);
     const tickMs =
-      BASE_TICK_MS / (roundParams(state.round).speed * clockParams(state.clock).speed);
+      BASE_TICK_MS / (roundParams(round).speed * clockParams(state.clock).speed);
     if (acc > tickMs * MAX_CATCHUP_TICKS) acc = tickMs * MAX_CATCHUP_TICKS;
 
     let dirty = false;

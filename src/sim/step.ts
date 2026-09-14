@@ -42,6 +42,7 @@ import {
   NIGHT_NOISE_FILL,
   NIGHT_NOISE_MAX,
   clockParams,
+  effectiveRound,
 } from "./clock";
 import { batteryDead, hasStuckSegment, nextBattery, pickStuckPose } from "./battery";
 import {
@@ -198,7 +199,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // see below), then he's here at a round's worth of extra difficulty.
   const nightAwake = state.clock === "night" && state.nightWoken;
   const brunoHere = roundTick >= cp.brunoAwayUntil || nightAwake;
-  const params = nightAwake ? roundParams(state.round + 1) : roundParams(state.round);
+  const params = roundParams(effectiveRound(state.round, state.clock, state.nightWoken));
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;

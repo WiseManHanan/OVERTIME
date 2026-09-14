@@ -11,7 +11,7 @@
 import type { ClockMode } from "./clock";
 import { nextInt, type RngState } from "./rng";
 import type { Floor } from "./world";
-import { FLOORS, isStandable } from "./world";
+import { FLOORS, SLOT_COUNT, isStandable } from "./world";
 
 export const BATTERY_DEPLETE = 0.14; // per round, once it starts
 export const BATTERY_CLEAN_BONUS = 0.05; // a round cleared with no miss claws some back
@@ -81,7 +81,7 @@ export function pickStuckPose(rng: RngState): [StuckPose, RngState] {
   let s = 0;
   for (let tries = 0; tries < 8; tries++) {
     const [fi, r1] = nextInt(r, FLOORS.length);
-    const [si, r2] = nextInt(r1, 10);
+    const [si, r2] = nextInt(r1, SLOT_COUNT);
     r = r2;
     f = FLOORS[fi]!;
     s = si;
