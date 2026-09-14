@@ -48,8 +48,8 @@ const CHAIR_CHANCE = 0.34;
  *  still moves at 1 slot/tick — same pace as a barrel, distinguished only by
  *  being duck-only — so the round it unlocks isn't also the round a player
  *  first has to react to a hazard that can close two slots inside a single
- *  ~140ms tick. Full speed is still the steady-state identity; this only
- *  softens the introduction. */
+ *  tick. Full speed is still the steady-state identity; this only softens
+ *  the introduction. */
 export const CHAIR_FULL_SPEED_ROUND = 5;
 
 /** The speed a hazard actually rolls at this round — barrels are always 1;

@@ -251,15 +251,19 @@ The original's flaw is that its optimal strategy is patience. Every system below
 
 ### 6.1 Speed table
 
+Flattened after playtesting found the original curve escalated too fast —
+every knob below grows at roughly half the original rate and settles on a
+much gentler asymptote.
+
 | Round | Speed multiplier | Hazard cadence (ticks) | Bruno swipe (ticks) |
 |---|---|---|---|
 | 1 | 1.00 | 14 | 9 |
-| 2 | 1.10 | 12 | 9 |
-| 3 | 1.20 | 11 | 8 |
-| 4 | 1.32 | 10 | 8 |
-| 5 | 1.45 | 9 | 7 |
-| 6 | 1.60 | 8 | 7 |
-| 7+ | ×1.10 per round, capped at 2.60 | min 6 | min 5 |
+| 2 | 1.04 | 13 | 9 |
+| 3 | 1.08 | 13 | 9 |
+| 4 | 1.13 | 12 | 8 |
+| 5 | 1.18 | 12 | 8 |
+| 6 | 1.24 | 11 | 8 |
+| 7+ | ×1.04 per round, capped at 1.80 | min 8, −1 every 2 rounds past 6 | min 6, −1 every 2 rounds past 6 |
 
 ### 6.2 The boredom meter
 
