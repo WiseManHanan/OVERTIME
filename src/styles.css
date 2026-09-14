@@ -436,8 +436,13 @@ body {
 }
 
 .info-misses {
-  margin: 0 0 16px;
+  margin: 0 0 10px;
   font-weight: 600;
+}
+
+.info-steward {
+  margin: 0 0 16px;
+  color: var(--shell-shadow);
 }
 
 .info-close {

@@ -29,6 +29,13 @@ const TEMPLATE = `
       <li><strong>Chairs</strong> roll high and fast &mdash; duck them, they can't be jumped.</li>
     </ul>
     <p class="info-misses">${MISSES_ALLOWED} misses ends the run.</p>
+    <p class="info-steward">
+      Watch <strong>THE STEWARD</strong>'s bar, bottom-left of the lower screen
+      &mdash; it's a boredom meter, not decoration. Play it safe and it fills,
+      dropping your score multiplier and eventually zeroing it while he
+      dozes off. Near misses, bolts, and changing floors drain it and pay
+      better &mdash; caution is the losing move.
+    </p>
     <button class="info-close" type="submit">Got it</button>
   </form>
 </dialog>
