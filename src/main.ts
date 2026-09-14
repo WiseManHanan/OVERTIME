@@ -8,6 +8,7 @@
  */
 import { buildShell } from "./shell/shell";
 import { createInput } from "./shell/input";
+import { initInfoPanel } from "./shell/infoPanel";
 import { readPalette } from "./panel/colors";
 import { PANEL_W, PANEL_H } from "./panel/dims";
 import { renderPanel, type PanelView } from "./panel/render";
@@ -35,6 +36,7 @@ if (mount === null) throw new Error("#app mount point missing from index.html");
 const shell = buildShell(mount);
 const pal = readPalette();
 const input = createInput(shell);
+initInfoPanel(); // the "how to play" link, below the shell (doc §3.3)
 
 // Audio (doc §4.5). The simulation stays silent; sound is main.ts diffing one
 // GameState against the next and firing the matching cue on the single voice.
