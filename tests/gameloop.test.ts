@@ -141,6 +141,9 @@ describe("misses and game over (doc §5.6)", () => {
     expect(s.hitFlash).toBe(0);
     expect(s.phase).toBe("playing"); // survived — play resumes, no GAME OVER
     expect(s.tick).toBe(beforeHit.tick + 1 + HIT_FLASH_TICKS);
+    expect(s.pip.floor).toBe(START_FLOOR); // sent back to the start, like a haul
+    expect(s.pip.slot).toBe(START_SLOT);
+    expect(s.pip.pose).toBe("stand");
   });
 
   it("jumping over a barrel is not a miss", () => {

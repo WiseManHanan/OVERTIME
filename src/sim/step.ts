@@ -246,13 +246,17 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // A hit freezes everything else — Bruno, hazards, scoring, input — while
   // Pip blinks (scene.ts reads hitFlash for that). The tick this reaches 0 is
   // also where a fatal hit's GAME OVER actually lands, so the blink always
-  // finishes playing before the results screen cuts in.
+  // finishes playing before the results screen cuts in; a survived hit sends
+  // Pip back to the start once it's done, same as a successful bolt haul.
   if (state.hitFlash > 0) {
     const hitFlash = state.hitFlash - 1;
     const effects0 = effectsFor(state.concessions);
     const missesAllowed0 = MISSES_ALLOWED + effects0.extraMisses;
-    if (hitFlash === 0 && state.misses >= missesAllowed0) {
-      return { ...state, tick: state.tick + 1, hitFlash, phase: "over" };
+    if (hitFlash === 0) {
+      if (state.misses >= missesAllowed0) {
+        return { ...state, tick: state.tick + 1, hitFlash, phase: "over" };
+      }
+      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip() };
     }
     return {
       ...state,
