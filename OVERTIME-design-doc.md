@@ -107,7 +107,8 @@ This section is the heart of the project. Get it right and everything else reads
 ### 4.1 The tick
 
 ```ts
-const BASE_TICK_MS = 170;          // ~5.9 logical updates per second
+const BASE_TICK_MS = 250;          // 4/sec — eased down from the
+                                    // period-accurate ~5.9/sec, per playtest
 tickMs = BASE_TICK_MS / speedMultiplier;
 ```
 
