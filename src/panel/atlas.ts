@@ -9,7 +9,7 @@
  * he is about to take — is always on the glass.
  */
 import type { Screen, Seg, Shape } from "./types";
-import { PANEL_H, PANEL_W, SLOT_W, slotCenterX, floorBaselineY } from "./dims";
+import { PANEL_W, SLOT_W, slotCenterX, floorBaselineY } from "./dims";
 import {
   BOLT_SLOTS,
   FLOORS,
@@ -507,45 +507,6 @@ function brunoPlatformSeg(): Seg {
   };
 }
 
-/** The east lift (doc §7.4): from round 5, a shaft with a lit call button
- *  that never answers, until round 10, when the car finally shows up — and
- *  goes straight back down. Purely decorative (scene.ts gates all of it on
- *  `round`); none of it is interactive, so the closed hardware list (doc
- *  §4.4) is untouched. Sits past the slot-9 ladder, clear of it.
- *  `lift.car.f{k}` mirrors `bruno.fall.f{k}`'s discrete-frame pattern. */
-const LIFT_X = 152;
-const LIFT_Y_TOP = 26;
-const LIFT_Y_BOT = PANEL_H;
-
-function liftShaftSeg(): Seg {
-  const h = LIFT_Y_BOT - LIFT_Y_TOP;
-  return {
-    id: "lift.shaft",
-    screen: "upper",
-    shapes: [rect(LIFT_X, LIFT_Y_TOP, 1.4, h), rect(LIFT_X + 6, LIFT_Y_TOP, 1.4, h)],
-  };
-}
-
-function liftButtonSeg(): Seg {
-  return {
-    id: "lift.button",
-    screen: "upper",
-    shapes: [{ k: "circle", cx: LIFT_X + 3.4, cy: LIFT_Y_TOP - 4, r: 1.6 }],
-  };
-}
-
-/** `k`: 0 arrived at the top, 1 partway down, 2 gone past the bottom. */
-function liftCarSeg(k: number): Seg {
-  const span = LIFT_Y_BOT - LIFT_Y_TOP - 8;
-  const y = LIFT_Y_TOP + 2 + k * (span / 2);
-  return {
-    id: `lift.car.f${k}`,
-    screen: "upper",
-    shapes: [rect(LIFT_X - 0.6, y, 8.6, 6)],
-    noGhost: true, // transient, like Bruno's swipe/fall frames
-  };
-}
-
 /** Centred past Bruno's pacing reach (BRUNO_MAX_SLOT/CONSOLE_SLOT are both
  *  slot 8) so the gantry and its holders read as their own fixture at the
  *  platform's true east end, not just wherever Bruno happens to be standing. */
@@ -755,9 +716,6 @@ function build(): Seg[] {
   for (const mood of ["idle", "bell", "watch", "asleep"] as const) {
     segs.push({ id: `steward.${mood}`, screen: "lower", shapes: stewardShapes(mood) });
   }
-  segs.push(liftShaftSeg());
-  segs.push(liftButtonSeg());
-  for (let k = 0; k < 3; k++) segs.push(liftCarSeg(k));
   return segs;
 }
 

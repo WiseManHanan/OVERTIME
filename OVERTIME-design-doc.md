@@ -369,7 +369,6 @@ This is a difficulty mechanic that attacks *information* rather than reflexes, w
 
 Small, cheap, high return:
 
-- **The east lift.** From round 5, a printed lift shaft appears on the backdrop with a working call button that never arrives. On round 10, it arrives. It goes down.
 - **Segment awareness.** Roughly once per 400 ticks, the wrong Pip segment lights for one tick — an arm where a leg should be. Pip's next pose includes a brief shake. Never twice within 200 ticks. This should feel like a glitch the player is not sure they saw.
 
 ---
