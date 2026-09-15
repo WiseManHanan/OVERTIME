@@ -3,7 +3,7 @@
  * inks, drawn behind every segment and never animated, never occluded.
  *
  * Two opacity bands, not one: the structure Pip actually stands and climbs on
- * (poles, floor plates, ladders) prints bold and near-solid, the way a real
+ * (floor plates, ladders) prints bold and near-solid, the way a real
  * Game & Watch's girders read — thick, high-contrast, riveted. Everything
  * else (sky, water tank, the skip, warning chevrons, the Steward's bell) is
  * scenery behind that structure and stays faint, so it recedes rather than
@@ -17,7 +17,7 @@ import type { Screen } from "./types";
 import type { Palette } from "./colors";
 import { PANEL_W, PANEL_H, SLOT_W, slotCenterX, floorBaselineY } from "./dims";
 
-/** Girders, poles, ladders — what Pip stands and climbs on. Bold, not muted. */
+/** Girders and ladders — what Pip stands and climbs on. Bold, not muted. */
 const STRUCTURE_ALPHA = 0.95;
 /** Sky, water tank, the skip, chevrons, the bell — scenery behind the structure. */
 const DECO_ALPHA = 0.45;
@@ -27,17 +27,6 @@ export function drawBackdrop(ctx: CanvasRenderingContext2D, screen: Screen, pal:
   if (screen === "upper") drawUpper(ctx, pal);
   else drawLower(ctx, pal);
   ctx.restore();
-}
-
-/** Only the mid-span pole — the left and right edge poles used to run right
- *  behind the slot-0/slot-9 ladders, and now that both are bold instead of
- *  faint, that doubled-up red reads as clutter (and crowded the boredom
- *  meter, top-left of the lower screen). The ladders already carry the
- *  vertical line at those edges; no separate pole is needed under them. */
-function poles(ctx: CanvasRenderingContext2D, pal: Palette): void {
-  ctx.globalAlpha = STRUCTURE_ALPHA;
-  ctx.fillStyle = pal.printRed;
-  ctx.fillRect(PANEL_W / 2 - 1.5, 0, 3, PANEL_H);
 }
 
 /**
@@ -135,7 +124,6 @@ function drawUpper(ctx: CanvasRenderingContext2D, pal: Palette): void {
   ctx.fillRect(0, 0, PANEL_W, 9); // sky band
   ctx.fillRect(PANEL_W - 44, 2, 30, 9); // water tank
 
-  poles(ctx, pal);
   plate(ctx, pal, f4);
   plate(ctx, pal, f3);
   ladderAtSlot(ctx, pal, 9, f3, f4); // floor 3 -> floor 4
@@ -147,7 +135,6 @@ function drawLower(ctx: CanvasRenderingContext2D, pal: Palette): void {
   const f1 = floorBaselineY("lower", 1);
   const f2 = floorBaselineY("lower", 0);
 
-  poles(ctx, pal);
   plate(ctx, pal, f1);
   plate(ctx, pal, f2, [GAP_X]); // the gap at slots 4–5
   ladderAtSlot(ctx, pal, 9, f1, f2); // floor 1 -> floor 2
