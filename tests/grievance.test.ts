@@ -272,6 +272,7 @@ describe("concession effects reach the sim (doc §7.2)", () => {
     });
     s = step(s, null); // barrel 2 -> 3, onto Pip: the 4th miss
     expect(s.misses).toBe(4);
+    while (s.hitFlash > 0) s = step(s, null); // let the post-hit freeze finish
     expect(s.phase).toBe("over");
   });
 

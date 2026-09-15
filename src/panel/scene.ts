@@ -4,7 +4,7 @@
  * ids and on-panel text, nothing more.
  */
 import type { GameState } from "../sim/state";
-import { ROUND_CLEARED_TICKS } from "../sim/state";
+import { HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
 import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
@@ -36,7 +36,13 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   // Steward — steps aside, and only the card copy remains.
   const showArt = live && state.phase !== "mediation";
 
-  if (showArt && floorScreen(p.floor) === screen) {
+  // A hit blinks Pip 3 times before settling (step.ts's post-hit freeze) —
+  // hidden on odd half-periods of the countdown, visible on even ones and
+  // once it reaches 0.
+  const blinkedOut =
+    state.hitFlash > 0 && Math.floor((state.hitFlash - 1) / HIT_BLINK_HALF_PERIOD) % 2 === 1;
+
+  if (showArt && !blinkedOut && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
       lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
