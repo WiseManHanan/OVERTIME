@@ -58,8 +58,10 @@ function plate(
   const yTop = baselineY;
   const yBot = baselineY + 5;
   const railH = 1.6;
-  let x = 6;
-  const end = PANEL_W - 6;
+  // Full bleed to both screen edges — a girder that stops short of the bezel
+  // reads as afloat, not bolted to anything.
+  let x = 0;
+  const end = PANEL_W;
   const spans: [number, number][] = [];
   for (const [gx0, gx1] of gaps) {
     if (gx0 > x) spans.push([x, gx0]);
