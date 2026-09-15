@@ -111,6 +111,10 @@ export interface GameState {
   mediationCards: readonly ConcessionId[];
   /** Index into `mediationCards` the picker is currently on. */
   mediationSelected: number;
+  /** Ticks left in the post-hit freeze: counts down from HIT_FLASH_TICKS to 0.
+   *  `> 0` pauses everything else in `stepPlaying` (Bruno, hazards, scoring —
+   *  a bare tick/countdown decrement) while Pip blinks; 0 is normal play. */
+  hitFlash: number;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -134,6 +138,11 @@ export const SWIPE_REACH = 1;
 export const POINTS_PER_BOLT = 100;
 /** Dropping Bruno is the point of the round — pays well (doc §5.5). */
 export const POINTS_PER_ROUND_CLEAR = 750;
+/** Ticks the post-hit freeze holds for — three blinks at a 2-tick half-period
+ *  (hidden, visible, hidden, visible, hidden, visible), ending visible. */
+export const HIT_FLASH_TICKS = 12;
+/** Ticks per on/off half-cycle of the post-hit blink (scene.ts reads this). */
+export const HIT_BLINK_HALF_PERIOD = 2;
 
 export function freshPip(): Pip {
   return {
@@ -193,6 +202,7 @@ export function initialState(
     concessions: [],
     mediationCards: [],
     mediationSelected: 0,
+    hitFlash: 0,
   };
 }
 

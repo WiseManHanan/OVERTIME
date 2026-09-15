@@ -5,6 +5,7 @@ import {
   BRUNO_MIN_SLOT,
   BRUNO_SLOT,
   CONSOLE_SLOT,
+  HIT_FLASH_TICKS,
   MISSES_ALLOWED,
   POINTS_PER_BOLT,
   POINTS_PER_ROUND_CLEAR,
@@ -39,6 +40,15 @@ const at = (s: GameState, floor: Floor, slot: number): GameState => ({
   ...s,
   pip: { ...s.pip, floor, slot },
 });
+
+/** Steps through the post-hit freeze (doc-independent tuning, HIT_FLASH_TICKS)
+ *  so a fatal hit's GAME OVER — deferred until the blink finishes — actually
+ *  lands. */
+const throughHitFlash = (s: GameState): GameState => {
+  let cur = s;
+  while (cur.hitFlash > 0) cur = step(cur, null);
+  return cur;
+};
 
 describe("the console and round clear (doc §5.5)", () => {
   it("UP at the console starts a 3-tick haul that locks movement", () => {
@@ -97,8 +107,40 @@ describe("misses and game over (doc §5.6)", () => {
     let s = at(quietPlaying({ misses: 2, hazards: [mkBarrel(1, 2, 1)] }), 1, 3);
     s = step(s, null); // barrel 2 -> 3, onto Pip
     expect(s.misses).toBe(3);
+    expect(s.hitFlash).toBeGreaterThan(0); // pauses and blinks first
+    expect(s.phase).toBe("playing"); // GAME OVER waits for the blink
+    s = throughHitFlash(s);
     expect(s.phase).toBe("over");
     expect(s.hazards.length).toBe(0);
+  });
+
+  it("a survivable hit pauses everything but Pip's blink for HIT_FLASH_TICKS", () => {
+    let s = at(
+      quietPlaying({ misses: 0, hazards: [mkBarrel(1, 2, 1)], brunoSlot: BRUNO_SLOT, brunoDir: 1 }),
+      1,
+      3,
+    );
+    const beforeHit = s;
+    s = step(s, null); // barrel 2 -> 3, onto Pip: a survivable miss
+    expect(s.misses).toBe(1);
+    expect(s.hitFlash).toBe(HIT_FLASH_TICKS);
+    expect(s.phase).toBe("playing");
+
+    // Frozen ticks: input is ignored, Bruno doesn't pace, nothing but the
+    // tick counter and hitFlash itself move.
+    const frozenPip = s.pip;
+    const frozenBruno = s.brunoSlot;
+    for (let i = 0; i < HIT_FLASH_TICKS - 1; i++) {
+      s = step(s, "right");
+      expect(s.pip).toEqual(frozenPip);
+      expect(s.brunoSlot).toBe(frozenBruno);
+    }
+    expect(s.hitFlash).toBe(1);
+
+    s = step(s, null); // the last frozen tick: hitFlash reaches 0
+    expect(s.hitFlash).toBe(0);
+    expect(s.phase).toBe("playing"); // survived — play resumes, no GAME OVER
+    expect(s.tick).toBe(beforeHit.tick + 1 + HIT_FLASH_TICKS);
   });
 
   it("jumping over a barrel is not a miss", () => {
@@ -219,6 +261,7 @@ describe("edge cases the review turned up", () => {
     );
     s = step(s, null);
     expect(s.misses).toBe(MISSES_ALLOWED);
+    s = throughHitFlash(s);
     expect(s.phase).toBe("over");
   });
 

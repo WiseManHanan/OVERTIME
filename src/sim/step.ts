@@ -17,6 +17,7 @@ import {
   BRUNO_PACE_TICKS,
   BRUNO_SLOT,
   CONSOLE_SLOT,
+  HIT_FLASH_TICKS,
   MISSES_ALLOWED,
   POINTS_PER_BOLT,
   POINTS_PER_ROUND_CLEAR,
@@ -242,6 +243,25 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
 }
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
+  // A hit freezes everything else — Bruno, hazards, scoring, input — while
+  // Pip blinks (scene.ts reads hitFlash for that). The tick this reaches 0 is
+  // also where a fatal hit's GAME OVER actually lands, so the blink always
+  // finishes playing before the results screen cuts in.
+  if (state.hitFlash > 0) {
+    const hitFlash = state.hitFlash - 1;
+    const effects0 = effectsFor(state.concessions);
+    const missesAllowed0 = MISSES_ALLOWED + effects0.extraMisses;
+    if (hitFlash === 0 && state.misses >= missesAllowed0) {
+      return { ...state, tick: state.tick + 1, hitFlash, phase: "over" };
+    }
+    return {
+      ...state,
+      tick: state.tick + 1,
+      hitFlash,
+      swipe: Math.max(0, state.swipe - 1), // let a mid-swing arm settle, as stepCleared does
+    };
+  }
+
   const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
   const effects = effectsFor(state.concessions); // concessions taken so far (doc §7.2)
   const roundTick = state.tick - state.playingSince; // ticks into *this* round
@@ -456,8 +476,15 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   misses = Math.min(misses, missesAllowed); // two hits in one tick still ends it
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
-  if (misses >= missesAllowed) {
-    phase = "over";
+  let hitFlash = 0;
+  if (tookMiss) {
+    // Pause and blink first (doc-independent tuning, see HIT_FLASH_TICKS) —
+    // phase stays "playing" even if this was the hit that ends the run; the
+    // frozen branch at the top turns it "over" once the flash finishes, so
+    // GAME OVER never cuts in mid-blink. A round-clear on this same tick (if
+    // any) is deferred the same way — bolts stay released, so the next
+    // unfrozen tick catches it.
+    hitFlash = HIT_FLASH_TICKS;
   } else if (bolts.every((b) => b)) {
     // The platform still falls the ordinary way (doc §5.5) — a grievance
     // interlude, if this round earns one, waits for that to finish (stepCleared).
@@ -488,6 +515,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipeCountdown,
     swipe,
     clearedCountdown,
+    hitFlash,
     moveStreak,
     nightNoise,
     nightWoken,
@@ -606,6 +634,7 @@ function beginNextRound(state: GameState): GameState {
     swipeCountdown: params.swipeCadence,
     swipe: 0,
     clearedCountdown: 0,
+    hitFlash: 0,
     mediationCards: [],
     mediationSelected: 0,
     boredom: BOREDOM_START, // a fresh round starts back in the neutral band
