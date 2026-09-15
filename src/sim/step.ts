@@ -53,6 +53,13 @@ import {
   nextAsleep,
   nextBoredom,
 } from "./scoring";
+import { nextInt } from "./rng";
+import {
+  drawConcessionCards,
+  effectsFor,
+  isGrievanceRound,
+  type GrievanceEffects,
+} from "./grievance";
 
 export type InputAction = "left" | "right" | "up" | "down" | "a";
 
@@ -67,6 +74,8 @@ export function step(state: GameState, input: InputAction | null): GameState {
       return stepPlaying(state, input);
     case "cleared":
       return stepCleared(state);
+    case "mediation":
+      return stepMediation(state, input);
     case "over":
       // A trap state: the GAME OVER screen is a bare readout (scene.ts), so
       // nothing here matters but keeping the tick counter moving.
@@ -83,14 +92,30 @@ interface PipStep {
 }
 
 /**
- * Resolve one tick of Pip from `input`. Movement is locked during a bolt release
- * and during a jump arc; otherwise LEFT/RIGHT walk, UP climbs or starts a bolt
- * release, DOWN descends or ducks, A jumps (doc §5.2).
+ * Resolve one tick of Pip from `input`. Movement is locked during a bolt
+ * release, a multi-tick ladder climb (Safety Railing, doc §7.2), and a jump
+ * arc; otherwise LEFT/RIGHT walk, UP climbs or starts a bolt release, DOWN
+ * descends or ducks, A jumps (doc §5.2). `effects` folds in whatever
+ * concessions are in play — jump span, the gap, bolt/climb ticks — so a run
+ * with none behaves exactly as before (`effectsFor([])` is the neutral case).
  */
-function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): PipStep {
-  let { floor, slot, facing, airborne, releasing, releasingBolt } = p;
+function movePip(
+  p: Pip,
+  input: InputAction | null,
+  bolts: readonly boolean[],
+  effects: GrievanceEffects,
+): PipStep {
+  let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo } = p;
   let pose: PipPose = "stand";
   let releasedBolt = -1;
+  const boltTicks = effects.boltReleaseTicks ?? BOLT_RELEASE_TICKS;
+  // One place that reads the current bindings into a PipStep — every exit
+  // below calls this instead of re-listing all nine Pip fields itself, so a
+  // future field can't be threaded into three branches and missed in a fourth.
+  const result = (): PipStep => ({
+    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
+    releasedBolt,
+  });
 
   if (releasing > 0) {
     releasing -= 1;
@@ -101,7 +126,19 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
     } else {
       pose = "release";
     }
-    return { pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt }, releasedBolt };
+    return result();
+  }
+
+  if (climbing > 0) {
+    climbing -= 1;
+    if (climbing === 0) {
+      floor = climbTo ?? floor;
+      climbTo = null;
+      pose = "stand";
+    } else {
+      pose = "climb";
+    }
+    return result();
   }
 
   if (airborne > 0) {
@@ -109,7 +146,7 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
     if (airborne > 0) {
       // still mid-arc — locked
       pose = "jump";
-      return { pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt }, releasedBolt };
+      return result();
     }
     // landed this tick: `airborne` is 0 and matches "grounded", and this tick's
     // input applies immediately — fall through to the movement switch.
@@ -121,7 +158,7 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
       const dir = input === "left" ? -1 : 1;
       facing = dir;
       const target = slot + dir;
-      if (isStandable(floor, target)) {
+      if (isStandable(floor, target, effects.gapClosed)) {
         slot = target;
         pose = "walk";
       }
@@ -131,14 +168,20 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
       if (ladderUpAt(floor, slot)) {
         const up = floorAbove(floor);
         if (up !== null) {
-          floor = up;
-          pose = "climb";
+          if (effects.ladderClimbTicks <= 1) {
+            floor = up; // instant — the ordinary case
+            pose = "climb";
+          } else {
+            climbing = effects.ladderClimbTicks;
+            climbTo = up;
+            pose = "climb";
+          }
         }
       } else if (floor === 4 && slot === CONSOLE_SLOT) {
         // Haul the next lever that is still up (levers pull left to right).
         const nextLever = bolts.findIndex((b) => b !== true);
         if (nextLever >= 0) {
-          releasing = BOLT_RELEASE_TICKS;
+          releasing = boltTicks;
           releasingBolt = nextLever;
           pose = "release";
         }
@@ -149,8 +192,14 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
       if (ladderDownAt(floor, slot)) {
         const down = floorBelow(floor);
         if (down !== null) {
-          floor = down;
-          pose = "climb";
+          if (effects.ladderClimbTicks <= 1) {
+            floor = down;
+            pose = "climb";
+          } else {
+            climbing = effects.ladderClimbTicks;
+            climbTo = down;
+            pose = "climb";
+          }
         }
       } else {
         pose = "duck";
@@ -158,7 +207,7 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
       break;
     }
     case "a": {
-      const land = jumpLanding(floor, slot, facing);
+      const land = jumpLanding(floor, slot, facing, effects.jumpSpan, effects.gapClosed);
       airborne = JUMP_AIR_TICKS; // > 0 for both airborne ticks; hits 0 on landing
       pose = "jump";
       if (land !== null) slot = land;
@@ -168,13 +217,13 @@ function movePip(p: Pip, input: InputAction | null, bolts: readonly boolean[]): 
       break;
   }
 
-  return { pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt }, releasedBolt };
+  return result();
 }
 
 /* ---- phases --------------------------------------------------------------- */
 
 function stepTitle(state: GameState, input: InputAction | null): GameState {
-  const { pip } = movePip(state.pip, input, state.bolts);
+  const { pip } = movePip(state.pip, input, state.bolts, effectsFor(state.concessions));
   const moved = pip.floor !== state.pip.floor || pip.slot !== state.pip.slot;
   if (!moved) {
     return { ...state, tick: state.tick + 1, pip };
@@ -194,11 +243,13 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
 
 function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const cp = clockParams(state.clock); // time-of-day mode (doc §7.1)
+  const effects = effectsFor(state.concessions); // concessions taken so far (doc §7.2)
   const roundTick = state.tick - state.playingSince; // ticks into *this* round
   // NIGHT: asleep until the noise meter fills (state.nightWoken, set last tick —
-  // see below), then he's here at a round's worth of extra difficulty.
+  // see below), then he's here at a round's worth of extra difficulty. Longer
+  // Breaks adds its own pause on top, whatever the clock mode.
   const nightAwake = state.clock === "night" && state.nightWoken;
-  const brunoHere = roundTick >= cp.brunoAwayUntil || nightAwake;
+  const brunoHere = roundTick >= cp.brunoAwayUntil + effects.brunoPauseTicks || nightAwake;
   const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
   const params = roundParams(effRound);
   const pipFrom = state.pip;
@@ -223,7 +274,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   // 1 — Pip
-  const outcome = movePip(state.pip, input, state.bolts);
+  const outcome = movePip(state.pip, input, state.bolts, effects);
   let pip = outcome.pip;
   let bolts = state.bolts;
   const hauled = outcome.releasedBolt >= 0; // a lever came down this tick
@@ -245,12 +296,20 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipe = 2; // windup: arm out, no hit yet
   }
   if (swipeCountdown <= 0) {
-    swipeCountdown = params.swipeCadence;
+    // Recognition Programme: he's "visibly emotional and unpredictable" —
+    // each fresh cadence jitters ±3 ticks around the table value (doc §7.2).
+    let cadence = params.swipeCadence;
+    if (effects.swipeJitter) {
+      const [j, r2] = nextInt(rng, 7); // 0..6 -> -3..+3
+      rng = r2;
+      cadence = Math.max(1, cadence + (j - 3));
+    }
+    swipeCountdown = cadence;
     swipe = brunoHere ? 2 : 0;
     const inReach =
       brunoHere &&
       pip.floor === 4 &&
-      Math.abs(pip.slot - brunoSlot) <= SWIPE_REACH &&
+      Math.abs(pip.slot - brunoSlot) <= SWIPE_REACH + effects.swipeReachBonus &&
       pip.pose !== "jump" &&
       pip.pose !== "climb";
     if (inReach) {
@@ -307,7 +366,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     let hit = false;
     for (let i = 0; i < hazardSpeed(h.kind, effRound) && cur !== null; i++) {
       const from = cur;
-      const next = advanceHazard(from);
+      const next = advanceHazard(from, effects.gapClosed);
       if (next === null) {
         cur = null; // rolled off the board
         break;
@@ -337,17 +396,28 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       isAirborne(pip) && cur.floor === pip.floor && cur.slot === pip.slot;
     if (vacated || beneath) nearMisses += 1;
   }
-  rawPoints += nearMisses * NEAR_MISS_POINTS;
+  rawPoints += nearMisses * NEAR_MISS_POINTS * effects.nearMissMult;
 
   // 4 — spawn: the new hazard appears now but is checked only from next tick, so
   //     every one gets at least a tick of telegraph (doc §5.4). A haul tick
   //     spawns nothing — the stage just went quiet — and resets the cadence; and
-  //     nothing is thrown while Bruno is away (LUNCH / NIGHT).
+  //     nothing is thrown while Bruno is away (LUNCH / NIGHT). Longer Breaks
+  //     trades the pause above for a second hazard riding with the first once
+  //     he's back (doc §7.2).
   let spawnCountdown = hauled ? params.hazardCadence : state.spawnCountdown - 1;
   if (brunoHere && !hauled && spawnCountdown <= 0) {
     const [hazard, next] = spawnHazard(brunoSlot, state.round, rng);
     rng = next;
     survivors.push(hazard);
+    if (effects.doubleThrow) {
+      const [hazard2, next2] = spawnHazard(brunoSlot, state.round, rng);
+      rng = next2;
+      // Forced opposite to the first, not independently rolled: both start
+      // from Bruno's slot, so a same-direction roll would leave them exactly
+      // coincident — one sprite doing the work (and collision damage) of
+      // two — for their whole lifetime, not just the untelegraphed spawn tick.
+      survivors.push({ ...hazard2, dir: (-hazard.dir) as -1 | 1 });
+    }
     spawnCountdown = params.hazardCadence;
   }
 
@@ -378,14 +448,19 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   );
   const stewardAsleep = nextAsleep(state.stewardAsleep, boredom);
 
-  // 7 — resolve the round
+  // 7 — resolve the round. Training Budget raises the miss ceiling itself
+  //     (doc §7.2); everything downstream (the clamp, the game-over check)
+  //     reads that effective ceiling, not the base constant.
+  const missesAllowed = MISSES_ALLOWED + effects.extraMisses;
   const tookMiss = misses > state.misses; // any miss this tick (pre-clamp)
-  misses = Math.min(misses, MISSES_ALLOWED); // two hits in one tick still ends at 3
+  misses = Math.min(misses, missesAllowed); // two hits in one tick still ends it
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
-  if (misses >= MISSES_ALLOWED) {
+  if (misses >= missesAllowed) {
     phase = "over";
   } else if (bolts.every((b) => b)) {
+    // The platform still falls the ordinary way (doc §5.5) — a grievance
+    // interlude, if this round earns one, waits for that to finish (stepCleared).
     phase = "cleared";
     clearedCountdown = ROUND_CLEARED_TICKS;
     // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
@@ -394,7 +469,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   const score =
-    state.score + awardPoints(rawPoints, boredom, stewardAsleep, cp.points);
+    state.score +
+    awardPoints(rawPoints, boredom, stewardAsleep, cp.points * effects.pointsMult);
 
   return {
     ...state,
@@ -434,6 +510,56 @@ function stepCleared(state: GameState): GameState {
       swipe: Math.max(0, state.swipe - 1),
     };
   }
+
+  // The platform has finished falling. Every third clear opens a grievance
+  // interlude here, once that's fully played out — not before (doc §7.2) —
+  // unless the pool of concessions is already spent, in which case the round
+  // just begins the ordinary way.
+  if (isGrievanceRound(state.round)) {
+    const [cards, rng] = drawConcessionCards(state.concessions, state.rng);
+    if (cards.length > 0) {
+      return {
+        ...state,
+        tick: state.tick + 1,
+        phase: "mediation",
+        rng,
+        mediationCards: cards.map((c) => c.id),
+        mediationSelected: 0,
+      };
+    }
+  }
+  return beginNextRound(state);
+}
+
+/**
+ * Play is paused (doc §7.2): LEFT/RIGHT cycles the offered card, A picks it —
+ * the choice is appended to `concessions` (its effects apply from the very
+ * next round on) and the run hands off into the next round exactly as an
+ * ordinary ROUND CLEAR would. Anything else this tick is a no-op; nothing
+ * else moves while Bruno has stopped to talk.
+ */
+function stepMediation(state: GameState, input: InputAction | null): GameState {
+  const n = state.mediationCards.length;
+  if (n === 0) return { ...state, tick: state.tick + 1 }; // nothing offered — hold, don't divide by zero
+  if (input === "a") {
+    const chosen = state.mediationCards[state.mediationSelected]!;
+    return beginNextRound({
+      ...state,
+      concessions: [...state.concessions, chosen],
+      mediationCards: [],
+      mediationSelected: 0,
+    });
+  }
+  let mediationSelected = state.mediationSelected;
+  if (input === "left") mediationSelected = (mediationSelected - 1 + n) % n;
+  else if (input === "right") mediationSelected = (mediationSelected + 1) % n;
+  return { ...state, tick: state.tick + 1, mediationSelected };
+}
+
+/** The battery/round bookkeeping shared by an ordinary ROUND CLEAR and a
+ *  resolved grievance interlude (doc §7.2 and §7.3) — both hand off into the
+ *  next round identically once the round is truly behind Pip. */
+function beginNextRound(state: GameState): GameState {
   // The battery drains between rounds once it has started failing (doc §7.3).
   const battery = nextBattery(
     state.battery,
@@ -480,6 +606,8 @@ function stepCleared(state: GameState): GameState {
     swipeCountdown: params.swipeCadence,
     swipe: 0,
     clearedCountdown: 0,
+    mediationCards: [],
+    mediationSelected: 0,
     boredom: BOREDOM_START, // a fresh round starts back in the neutral band
     stewardAsleep: false,
     ticksSinceFloorChange: 0,

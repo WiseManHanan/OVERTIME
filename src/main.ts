@@ -18,6 +18,7 @@ import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
 import { clockParams, effectiveRound, resolveClock } from "./sim/clock";
 import { batteryContrast, batteryDetune, isBlackoutTick } from "./sim/battery";
+import { effectsFor } from "./sim/grievance";
 import { stewardMood } from "./sim/scoring";
 import { createBeeper, type Cue } from "./audio/beeper";
 import { loadMute, saveMute } from "./store/persist";
@@ -199,13 +200,17 @@ function startLoop(): void {
     acc += now - last;
     last = now;
 
-    // The round speed table (doc §6.1) and the time-of-day mode (doc §7.1) both
-    // scale the tick rate, not the sim. Once NIGHT's noise meter has woken
-    // Bruno, effectiveRound reads the same "one round harder" the hazard and
-    // swipe cadences already do (step.ts), so the whole round speeds up too.
+    // The round speed table (doc §6.1), the time-of-day mode (doc §7.1), and
+    // Overtime Pay's speed concession (doc §7.2) all scale the tick rate, not
+    // the sim. Once NIGHT's noise meter has woken Bruno, effectiveRound reads
+    // the same "one round harder" the hazard and swipe cadences already do
+    // (step.ts), so the whole round speeds up too.
     const round = effectiveRound(state.round, state.clock, state.nightWoken);
     const tickMs =
-      BASE_TICK_MS / (roundParams(round).speed * clockParams(state.clock).speed);
+      BASE_TICK_MS /
+      (roundParams(round).speed *
+        clockParams(state.clock).speed *
+        effectsFor(state.concessions).speedMult);
     if (acc > tickMs * MAX_CATCHUP_TICKS) acc = tickMs * MAX_CATCHUP_TICKS;
 
     let dirty = false;

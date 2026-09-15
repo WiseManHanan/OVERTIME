@@ -8,6 +8,7 @@ import { ROUND_CLEARED_TICKS } from "../sim/state";
 import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
+import { CONCESSION_CARDS } from "../sim/grievance";
 import type { Screen } from "./types";
 import type { TextSpec } from "./text";
 import { PANEL_W } from "./dims";
@@ -16,6 +17,8 @@ export interface Scene {
   lit: ReadonlySet<string>;
   texts: readonly TextSpec[];
 }
+
+const CARD_BY_ID = new Map(CONCESSION_CARDS.map((c) => [c.id, c]));
 
 const TITLE_TEXTS: readonly TextSpec[] = [
   { text: "OVERTIME", x: PANEL_W / 2, y: 7, cell: 13, kind: "seg14", align: "center" },
@@ -28,26 +31,30 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const p = state.pip;
   // GAME OVER is a results screen — the scaffold clears to just the readout.
   const live = state.phase !== "over";
+  // Mediation is text-only, top to bottom (doc §7.2): every art asset on
+  // either screen — Pip, Bruno, the platform, hazards, the console, the
+  // Steward — steps aside, and only the card copy remains.
+  const showArt = live && state.phase !== "mediation";
 
-  if (live && floorScreen(p.floor) === screen) {
+  if (showArt && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
       lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
     }
   }
   // ...and a phantom pose stuck lit where nobody is (doc §7.3).
-  if (live && state.stuckLit && floorScreen(state.stuckLit.f) === screen) {
+  if (showArt && state.stuckLit && floorScreen(state.stuckLit.f) === screen) {
     const g = state.stuckLit;
     lit.add(`pip.f${g.f}.s${g.s}.${g.pose}.r`);
   }
 
-  if (live) {
+  if (showArt) {
     for (const h of state.hazards) {
       if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
     }
   }
 
-  if (screen === "upper" && live) {
+  if (screen === "upper" && showArt) {
     if (state.phase === "cleared") {
       // Last holder pulled: the platform pivots off its anchor and takes Bruno
       // with it, across the ROUND CLEARED window (doc §5.5).
@@ -72,18 +79,42 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
 
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
+  }
 
+  if (screen === "upper" && live) {
     if (state.phase !== "title") {
       // One line across the very top-left: above Pip's tallest reach on floor 4
       // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
     }
+
+    if (state.phase === "mediation") {
+      // Bruno's sincere, specific complaint behind the card currently
+      // highlighted — "the comedy is in his being right" (doc §7.2).
+      const chosen = state.mediationCards[state.mediationSelected];
+      const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
+      if (card) {
+        // Dead centre of the screen — with Bruno and the platform out of the
+        // way above, there's nothing left to compete with it. Two short
+        // pre-broken lines (grievance.ts) hold a legible cell size without
+        // either one clipping the panel's edge.
+        const [line1, line2] = card.grievance;
+        texts.push({ text: line1, x: PANEL_W / 2, y: 36, cell: 7, kind: "seg14", align: "center" });
+        if (line2) {
+          texts.push({ text: line2, x: PANEL_W / 2, y: 50, cell: 7, kind: "seg14", align: "center" });
+        }
+      }
+    }
   }
 
   if (screen === "lower") {
-    // The Steward is always on his mark; his pose tracks the boredom meter.
-    lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+    // The Steward is always on his mark, pose tracking the boredom meter —
+    // except during mediation, where the card text stands alone and every
+    // character steps aside for it.
+    if (state.phase !== "mediation") {
+      lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+    }
 
     if (state.phase === "playing" || state.phase === "cleared") {
       const filled = Math.round((state.boredom / BOREDOM_MAX) * 10);
@@ -108,6 +139,32 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       texts.push({ text: "SCORE", x: PANEL_W / 2, y: 34, cell: 6, kind: "seg14", align: "center" });
       texts.push({ text: String(state.score), x: PANEL_W / 2, y: 44, cell: 14, kind: "seg7", align: "center" });
       texts.push({ text: "PRESS A", x: PANEL_W / 2, y: 68, cell: 7, kind: "seg14", align: "center" });
+    } else if (state.phase === "mediation") {
+      // The Steward presents up to three concession cards; LEFT/RIGHT cycles
+      // the highlight (the bigger cell), A picks it (doc §7.2).
+      texts.push({ text: "MEDIATION", x: PANEL_W / 2, y: 4, cell: 7, kind: "seg14", align: "center" });
+      state.mediationCards.forEach((id, i) => {
+        const card = CARD_BY_ID.get(id);
+        if (!card) return;
+        const on = i === state.mediationSelected;
+        texts.push({
+          text: card.title,
+          x: 6,
+          y: 18 + i * 12,
+          cell: on ? 7 : 5,
+          kind: "seg14",
+          align: "left",
+        });
+      });
+      const chosen = state.mediationCards[state.mediationSelected];
+      const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
+      if (card) {
+        // Cell 7 — the same size as GAME OVER's "PRESS A" — so the trade-off
+        // itself reads at a glance, not just the card's name above it.
+        texts.push({ text: card.youGain, x: 6, y: 58, cell: 7, kind: "seg14", align: "left" });
+        texts.push({ text: card.brunoGains, x: 6, y: 71, cell: 7, kind: "seg14", align: "left" });
+      }
+      texts.push({ text: "LEFT RIGHT A", x: PANEL_W / 2, y: 86, cell: 5, kind: "seg14", align: "center" });
     }
   }
 

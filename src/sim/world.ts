@@ -34,13 +34,15 @@ export function slotInRange(slot: number): boolean {
   return Number.isInteger(slot) && slot >= MIN_SLOT && slot <= MAX_SLOT;
 }
 
-export function isGap(floor: Floor, slot: number): boolean {
-  return (GAP_SLOTS[floor] ?? []).includes(slot);
+/** `gapClosed` is the Safety Railing concession (doc §7.2) — the floor-2 gap
+ *  becomes ordinary floor for the rest of the run, Pip and hazards alike. */
+export function isGap(floor: Floor, slot: number, gapClosed = false): boolean {
+  return !gapClosed && (GAP_SLOTS[floor] ?? []).includes(slot);
 }
 
 /** A slot Pip can stand in: on the grid, and floored. */
-export function isStandable(floor: Floor, slot: number): boolean {
-  return slotInRange(slot) && !isGap(floor, slot);
+export function isStandable(floor: Floor, slot: number, gapClosed = false): boolean {
+  return slotInRange(slot) && !isGap(floor, slot, gapClosed);
 }
 
 export function ladderUpAt(floor: Floor, slot: number): boolean {
@@ -79,17 +81,32 @@ export function boltIndexAt(slot: number): number {
  * Where a jump from `(floor, slot)` in direction `dir` lands, or `null` if it is
  * blocked (screen edge, or a gap too wide to clear from here).
  *
- * A single step into a standable slot is an ordinary hop. A step into a gap
- * clears that one contiguous run of gap slots and lands on the far lip — this is
- * the "gap that must be jumped" from §5.1. You must be standing on the lip for
- * it to work; from further back the jump is just an ordinary hop.
+ * A `span`-slot step (1 normally, 2 with the Ergonomic Assessment concession,
+ * doc §7.2) into a standable slot is an ordinary hop. A step into a gap clears
+ * that one contiguous run of gap slots and lands on the far lip — this is the
+ * "gap that must be jumped" from §5.1. You must be standing within `span` of
+ * the lip for it to work; from further back the jump is just an ordinary hop.
  */
-export function jumpLanding(floor: Floor, slot: number, dir: -1 | 1): number | null {
-  let t = slot + dir;
-  if (isStandable(floor, t)) return t;
-  if (!slotInRange(t)) return null; // walked off the edge
-  while (slotInRange(t) && isGap(floor, t)) t += dir;
-  return isStandable(floor, t) ? t : null;
+export function jumpLanding(
+  floor: Floor,
+  slot: number,
+  dir: -1 | 1,
+  span: 1 | 2 = 1,
+  gapClosed = false,
+): number | null {
+  // A span-2 hop that overshoots the board falls back to span 1 — Ergonomic
+  // Assessment (doc §7.2) is strictly a buff, so it must never turn a jump
+  // that would otherwise land safely (e.g. slot 8 -> 9 at the east edge)
+  // into one that instead sails off the edge and fails.
+  for (let s = span; s >= 1; s--) {
+    const t0 = slot + dir * s;
+    if (isStandable(floor, t0, gapClosed)) return t0;
+    if (!slotInRange(t0)) continue; // this span walks off the edge — try shorter
+    let t = t0;
+    while (slotInRange(t) && isGap(floor, t, gapClosed)) t += dir;
+    if (isStandable(floor, t, gapClosed)) return t;
+  }
+  return null;
 }
 
 /* ---- placement on the two physical screens (doc §5.1) ---------------------- */

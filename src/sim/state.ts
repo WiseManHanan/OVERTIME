@@ -14,12 +14,14 @@ import { BOREDOM_START } from "./scoring";
 import type { ClockMode } from "./clock";
 import type { StuckPose } from "./battery";
 import type { Hazard } from "./hazards";
+import type { ConcessionId } from "./grievance";
 
 export type Facing = -1 | 1;
 export type PipPose = "stand" | "walk" | "climb" | "duck" | "jump" | "release";
 
-/** The run's overall state machine. */
-export type RunPhase = "title" | "playing" | "cleared" | "over";
+/** The run's overall state machine. `mediation` is the grievance interlude
+ *  (doc §7.2) — play is paused while the Steward presents concession cards. */
+export type RunPhase = "title" | "playing" | "cleared" | "over" | "mediation";
 
 export interface Pip {
   floor: Floor;
@@ -35,6 +37,11 @@ export interface Pip {
   releasing: number;
   /** Index into BOLT_SLOTS currently being released, or -1. */
   releasingBolt: number;
+  /** Ticks left in a ladder climb. Normally 0 — a climb is instant — but the
+   *  Safety Railing concession (doc §7.2) makes it take two, movement-locked
+   *  like a bolt release. `>0` means locked; `climbTo` is the floor it lands on. */
+  climbing: number;
+  climbTo: Floor | null;
 }
 
 export interface GameState {
@@ -95,6 +102,15 @@ export interface GameState {
   nightNoise: number;
   /** NIGHT only: the meter filled and Bruno is up for the rest of the round. */
   nightWoken: boolean;
+  /** Concession cards taken so far, in pick order — persists the whole run
+   *  (doc §7.2). Drives both the effects in play and which cards remain in
+   *  the pool for the next interlude. */
+  concessions: readonly ConcessionId[];
+  /** The (up to three) cards on offer during a `mediation` phase. Empty
+   *  outside one. */
+  mediationCards: readonly ConcessionId[];
+  /** Index into `mediationCards` the picker is currently on. */
+  mediationSelected: number;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -128,6 +144,8 @@ export function freshPip(): Pip {
     airborne: 0,
     releasing: 0,
     releasingBolt: -1,
+    climbing: 0,
+    climbTo: null,
   };
 }
 
@@ -172,6 +190,9 @@ export function initialState(
     moveStreak: 0,
     nightNoise: 0,
     nightWoken: false,
+    concessions: [],
+    mediationCards: [],
+    mediationSelected: 0,
   };
 }
 

@@ -81,7 +81,7 @@ export function spawnHazard(
  * left the board off the ground floor. A chair calls this twice per tick
  * (step.ts) so its floor-descent and end-reversal stay correct mid-sweep.
  */
-export function advanceHazard(h: Hazard): Hazard | null {
+export function advanceHazard(h: Hazard, gapClosed = false): Hazard | null {
   const next = h.slot + h.dir;
 
   if (next < MIN_SLOT || next > MAX_SLOT) {
@@ -89,7 +89,7 @@ export function advanceHazard(h: Hazard): Hazard | null {
     return { ...h, floor: (h.floor - 1) as Floor, dir: (-h.dir) as -1 | 1 };
   }
 
-  if (isGap(h.floor, next)) {
+  if (isGap(h.floor, next, gapClosed)) {
     // Only floor 2 has a gap, so `floor - 1` here is always a real floor.
     return { ...h, floor: (h.floor - 1) as Floor, slot: next };
   }
