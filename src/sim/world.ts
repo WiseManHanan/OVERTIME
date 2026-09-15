@@ -94,11 +94,19 @@ export function jumpLanding(
   span: 1 | 2 = 1,
   gapClosed = false,
 ): number | null {
-  let t = slot + dir * span;
-  if (isStandable(floor, t, gapClosed)) return t;
-  if (!slotInRange(t)) return null; // walked off the edge
-  while (slotInRange(t) && isGap(floor, t, gapClosed)) t += dir;
-  return isStandable(floor, t, gapClosed) ? t : null;
+  // A span-2 hop that overshoots the board falls back to span 1 — Ergonomic
+  // Assessment (doc §7.2) is strictly a buff, so it must never turn a jump
+  // that would otherwise land safely (e.g. slot 8 -> 9 at the east edge)
+  // into one that instead sails off the edge and fails.
+  for (let s = span; s >= 1; s--) {
+    const t0 = slot + dir * s;
+    if (isStandable(floor, t0, gapClosed)) return t0;
+    if (!slotInRange(t0)) continue; // this span walks off the edge — try shorter
+    let t = t0;
+    while (slotInRange(t) && isGap(floor, t, gapClosed)) t += dir;
+    if (isStandable(floor, t, gapClosed)) return t;
+  }
+  return null;
 }
 
 /* ---- placement on the two physical screens (doc §5.1) ---------------------- */

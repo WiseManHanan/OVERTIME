@@ -642,7 +642,11 @@ function build(): Seg[] {
     const climbHere = new Set(climbSlots(floor));
 
     for (let s = 0; s <= MAX_SLOT; s++) {
-      if (!isStandable(floor, s)) continue;
+      // Built as if the floor-2 gap were always closed: the atlas is static,
+      // built once before any GameState exists, but Safety Railing (doc §7.2)
+      // can close that gap at runtime. Without this, Pip or a hazard standing
+      // on slot 4/5 there would have no segment to light at all.
+      if (!isStandable(floor, s, true)) continue;
       const cx = slotCenterX(s);
 
       const poses: PipPose[] = [...GRID_POSES];

@@ -190,6 +190,23 @@ describe("the mediation phase (doc §7.2)", () => {
     const cleared = throughRoundClear(step(s, null));
     expect(cleared.phase).toBe("playing"); // nothing left to offer
   });
+
+  it("never divides by zero if mediation is ever reached with nothing offered", () => {
+    // Defensive: nothing today produces this (stepCleared always checks
+    // cards.length > 0 first), but the type system doesn't forbid it.
+    const s: GameState = {
+      ...initialState(1),
+      phase: "mediation",
+      mediationCards: [],
+      mediationSelected: 0,
+    };
+    for (const input of ["left", "right", "a"] as const) {
+      const next = step(s, input);
+      expect(next.phase).toBe("mediation");
+      expect(Number.isNaN(next.mediationSelected)).toBe(false);
+      expect(next.tick).toBe(s.tick + 1);
+    }
+  });
 });
 
 /* ---- integration: each concession's effect actually applies --------------- */
@@ -206,6 +223,15 @@ describe("concession effects reach the sim (doc §7.2)", () => {
 
   it("Ergonomic Assessment: a jump clears two slots instead of one", () => {
     expect(jumpLanding(1, 3, 1, 2)).toBe(5);
+  });
+
+  it("Ergonomic Assessment: a span-2 hop that overshoots the edge falls back to span 1", () => {
+    // From slot 8 rightward, a plain (span 1) hop lands safely on slot 9; the
+    // longer jump must never turn that into a jump off the edge instead.
+    expect(jumpLanding(1, 8, 1, 1)).toBe(9);
+    expect(jumpLanding(1, 8, 1, 2)).toBe(9);
+    expect(jumpLanding(1, 1, -1, 1)).toBe(0);
+    expect(jumpLanding(1, 1, -1, 2)).toBe(0);
   });
 
   it("Ergonomic Assessment: the swipe reach grows by one slot", () => {
@@ -287,5 +313,23 @@ describe("concession effects reach the sim (doc §7.2)", () => {
     let s = playingWith(["longerBreaks"], { spawnCountdown: 1, round: 1, tick: 20 });
     s = step(s, null); // roundTick 21 -> past the 20-tick pause
     expect(s.hazards.filter((h) => h.floor === 4).length).toBe(2); // both landed at spawn
+  });
+
+  it("Longer Breaks: the pair always rolls opposite ways, never coincides", () => {
+    // Same spawn slot, so a same-direction roll would leave them exactly
+    // overlapped — one visible sprite doing the collision work of two —
+    // for their whole lifetime. Across enough seeds to catch a coin-flip bug.
+    for (let seed = 1; seed <= 30; seed++) {
+      let s = playingWith(["longerBreaks"], {
+        spawnCountdown: 1,
+        round: 1,
+        tick: 20,
+        rng: seedRng(seed),
+      });
+      s = step(s, null);
+      const spawned = s.hazards.filter((h) => h.floor === 4);
+      expect(spawned.length).toBe(2);
+      expect(spawned[0]!.dir).toBe(-spawned[1]!.dir);
+    }
   });
 });

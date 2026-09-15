@@ -109,6 +109,13 @@ function movePip(
   let pose: PipPose = "stand";
   let releasedBolt = -1;
   const boltTicks = effects.boltReleaseTicks ?? BOLT_RELEASE_TICKS;
+  // One place that reads the current bindings into a PipStep — every exit
+  // below calls this instead of re-listing all nine Pip fields itself, so a
+  // future field can't be threaded into three branches and missed in a fourth.
+  const result = (): PipStep => ({
+    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
+    releasedBolt,
+  });
 
   if (releasing > 0) {
     releasing -= 1;
@@ -119,10 +126,7 @@ function movePip(
     } else {
       pose = "release";
     }
-    return {
-      pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
-      releasedBolt,
-    };
+    return result();
   }
 
   if (climbing > 0) {
@@ -134,10 +138,7 @@ function movePip(
     } else {
       pose = "climb";
     }
-    return {
-      pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
-      releasedBolt,
-    };
+    return result();
   }
 
   if (airborne > 0) {
@@ -145,10 +146,7 @@ function movePip(
     if (airborne > 0) {
       // still mid-arc — locked
       pose = "jump";
-      return {
-        pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
-        releasedBolt,
-      };
+      return result();
     }
     // landed this tick: `airborne` is 0 and matches "grounded", and this tick's
     // input applies immediately — fall through to the movement switch.
@@ -219,10 +217,7 @@ function movePip(
       break;
   }
 
-  return {
-    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
-    releasedBolt,
-  };
+  return result();
 }
 
 /* ---- phases --------------------------------------------------------------- */
@@ -417,7 +412,11 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     if (effects.doubleThrow) {
       const [hazard2, next2] = spawnHazard(brunoSlot, state.round, rng);
       rng = next2;
-      survivors.push(hazard2);
+      // Forced opposite to the first, not independently rolled: both start
+      // from Bruno's slot, so a same-direction roll would leave them exactly
+      // coincident — one sprite doing the work (and collision damage) of
+      // two — for their whole lifetime, not just the untelegraphed spawn tick.
+      survivors.push({ ...hazard2, dir: (-hazard.dir) as -1 | 1 });
     }
     spawnCountdown = params.hazardCadence;
   }
@@ -541,7 +540,8 @@ function stepCleared(state: GameState): GameState {
  */
 function stepMediation(state: GameState, input: InputAction | null): GameState {
   const n = state.mediationCards.length;
-  if (input === "a" && n > 0) {
+  if (n === 0) return { ...state, tick: state.tick + 1 }; // nothing offered — hold, don't divide by zero
+  if (input === "a") {
     const chosen = state.mediationCards[state.mediationSelected]!;
     return beginNextRound({
       ...state,
