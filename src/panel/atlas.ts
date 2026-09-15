@@ -593,6 +593,25 @@ function boredomPipSeg(i: number): Seg {
   return { id: `boredom.p${i}`, screen: "lower", shapes: [rect(6 + i * 3.2, 3, 2, 3)] };
 }
 
+/** Mara, tucked above Bruno's platform in the upper panel's left margin,
+ *  outside the play grid — "at slot 0, off-grid" (doc §5.1). Sat this high
+ *  (not at floor 4's own baseline) to clear the platform's west anchor
+ *  bracket just below her. She's at the top and never in danger; a phone,
+ *  held to her ear, is the whole character (doc §2, §7.4). */
+function maraShapes(): Shape[] {
+  const cx = 7;
+  const b = 17;
+  return [
+    poly([[cx - 1.8, b - 16.5], [cx + 2, b - 16.5], [cx + 2, b - 12.8], [cx - 1.8, b - 12.8]]), // head
+    poly([[cx - 2.6, b - 12.2], [cx + 2.8, b - 12.2], [cx + 2.2, b - 3], [cx - 2.2, b - 3]]), // torso
+    rect(cx - 2.2, b - 3, 2, 3), // legs
+    rect(cx + 0.2, b - 3, 2, 3),
+    // arm up, phone to her ear
+    poly([[cx + 2, b - 12], [cx + 3.6, b - 12.6], [cx + 4.4, b - 15.8], [cx + 2.8, b - 15.2]]),
+    rect(cx + 3.4, b - 16.6, 1.8, 2.4), // the phone
+  ];
+}
+
 /** The Steward, in the lower panel's left margin, outside the play grid (doc
  *  §5.1). His whole job is to react to the boredom meter: `bell` rings it
  *  approvingly, `watch` checks the time, `asleep` is out cold (doc §6.2). */
@@ -716,6 +735,7 @@ function build(): Seg[] {
   for (const mood of ["idle", "bell", "watch", "asleep"] as const) {
     segs.push({ id: `steward.${mood}`, screen: "lower", shapes: stewardShapes(mood) });
   }
+  segs.push({ id: "mara", screen: "upper", shapes: maraShapes() });
   return segs;
 }
 

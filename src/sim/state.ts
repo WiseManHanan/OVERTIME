@@ -115,6 +115,20 @@ export interface GameState {
    *  `> 0` pauses everything else in `stepPlaying` (Bruno, hazards, scoring —
    *  a bare tick/countdown decrement) while Pip blinks; 0 is normal play. */
   hitFlash: number;
+  /** Mara's rating (1-10) for the most recent miss (doc §7.4), or `null`
+   *  before the first one. Shown near her while `maraRatingTicks > 0`. */
+  maraRating: number | null;
+  maraRatingTicks: number;
+  /** Segment awareness (doc §7.4): 2 while the "wrong segment" glitch is
+   *  active (2 = the mismatched pose lights, 1 = a one-slot "shake"), 0
+   *  otherwise. */
+  glitchTicks: number;
+  /** Ticks left before another glitch may roll — "never twice within 200
+   *  ticks." Independent of glitchTicks; keeps ticking down through one. */
+  glitchCooldown: number;
+  /** The mismatched pose the glitch tick lights, chosen when it fires.
+   *  Meaningless while glitchTicks is 0. */
+  glitchPose: PipPose | null;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -143,6 +157,16 @@ export const POINTS_PER_ROUND_CLEAR = 750;
 export const HIT_FLASH_TICKS = 12;
 /** Ticks per on/off half-cycle of the post-hit blink (scene.ts reads this). */
 export const HIT_BLINK_HALF_PERIOD = 2;
+/** Segment awareness (doc §7.4): roughly this often, in expectation. */
+export const GLITCH_CHANCE = 1 / 400;
+/** "Never twice within 200 ticks." */
+export const GLITCH_COOLDOWN_TICKS = 200;
+/** One tick of the mismatched pose, one tick of the shake. */
+export const GLITCH_TICKS = 2;
+/** The small, harmless poses the glitch can show in place of Pip's real one —
+ *  a full mismatch (e.g. "release") would look like a real state change,
+ *  not a glitch. */
+export const GLITCH_POSES: readonly PipPose[] = ["stand", "walk", "duck", "jump"];
 
 export function freshPip(): Pip {
   return {
@@ -203,6 +227,11 @@ export function initialState(
     mediationCards: [],
     mediationSelected: 0,
     hitFlash: 0,
+    maraRating: null,
+    maraRatingTicks: 0,
+    glitchTicks: 0,
+    glitchCooldown: 0,
+    glitchPose: null,
   };
 }
 

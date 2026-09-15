@@ -4,9 +4,9 @@
  * ids and on-panel text, nothing more.
  */
 import type { GameState } from "../sim/state";
-import { HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
+import { GLITCH_TICKS, HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
 import { sameCell } from "../sim/battery";
-import { BOLT_SLOTS, floorScreen } from "../sim/world";
+import { BOLT_SLOTS, floorScreen, isStandable } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import { CONCESSION_CARDS } from "../sim/grievance";
 import type { Screen } from "./types";
@@ -45,7 +45,20 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   if (showArt && !blinkedOut && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
-      lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
+      const face = p.facing === 1 ? "r" : "l";
+      if (state.glitchTicks === GLITCH_TICKS && state.glitchPose) {
+        // Segment awareness (doc §7.4): the wrong pose lights for this one
+        // tick — "an arm where a leg should be," at our whole-pose grain.
+        lit.add(`pip.f${p.floor}.s${p.slot}.${state.glitchPose}.${face}`);
+      } else if (state.glitchTicks === 1) {
+        // ...then a one-slot "shake" on his next, correct pose. Falls back
+        // to no shake if the neighbouring slot isn't one Pip could stand in.
+        const jitterSlot = p.slot - p.facing;
+        const shakeSlot = isStandable(p.floor, jitterSlot, true) ? jitterSlot : p.slot;
+        lit.add(`pip.f${p.floor}.s${shakeSlot}.${p.pose}.${face}`);
+      } else {
+        lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${face}`);
+      }
     }
   }
   // ...and a phantom pose stuck lit where nobody is (doc §7.3).
@@ -85,6 +98,10 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
 
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
+
+    // Mara, at the top — on the phone, off-grid past the west edge (doc
+    // §5.1). Always there, regardless of what Bruno's doing.
+    lit.add("mara");
   }
 
   if (screen === "upper" && live) {
@@ -93,6 +110,12 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
+    }
+
+    // Mara's verdict on the miss that just happened (doc §7.4) — in
+    // 7-segment, since it's a number, not a word.
+    if (state.maraRatingTicks > 0 && state.maraRating !== null && state.phase !== "mediation") {
+      texts.push({ text: String(state.maraRating), x: 14, y: 26, cell: 7, kind: "seg7", align: "left" });
     }
 
     if (state.phase === "mediation") {
