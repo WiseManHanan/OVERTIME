@@ -29,11 +29,14 @@ export function drawBackdrop(ctx: CanvasRenderingContext2D, screen: Screen, pal:
   ctx.restore();
 }
 
+/** Only the mid-span pole — the left and right edge poles used to run right
+ *  behind the slot-0/slot-9 ladders, and now that both are bold instead of
+ *  faint, that doubled-up red reads as clutter (and crowded the boredom
+ *  meter, top-left of the lower screen). The ladders already carry the
+ *  vertical line at those edges; no separate pole is needed under them. */
 function poles(ctx: CanvasRenderingContext2D, pal: Palette): void {
   ctx.globalAlpha = STRUCTURE_ALPHA;
   ctx.fillStyle = pal.printRed;
-  ctx.fillRect(12, 0, 4, PANEL_H);
-  ctx.fillRect(PANEL_W - 16, 0, 4, PANEL_H);
   ctx.fillRect(PANEL_W / 2 - 1.5, 0, 3, PANEL_H);
 }
 
