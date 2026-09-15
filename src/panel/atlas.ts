@@ -507,10 +507,15 @@ function brunoPlatformSeg(): Seg {
   };
 }
 
+/** Centred past Bruno's pacing reach (BRUNO_MAX_SLOT/CONSOLE_SLOT are both
+ *  slot 8) so the gantry and its holders read as their own fixture at the
+ *  platform's true east end, not just wherever Bruno happens to be standing. */
+const GANTRY_CX = slotCenterX(8) + 5;
+
 /** The overhead gantry the holders hang from — a fixed hook fixture at the
  *  platform's free (east) end. Always lit while the round is live. */
 function gantrySeg(): Seg {
-  const cx = slotCenterX(8);
+  const cx = GANTRY_CX;
   const top = 3;
   return {
     id: "gantry",
@@ -527,7 +532,7 @@ function gantrySeg(): Seg {
  *  end. Lit until Pip pulls it at the console; all four out and the platform
  *  pivots off its anchor — Bruno falls (doc §5.5). */
 function holderSeg(i: number): Seg {
-  const cx = slotCenterX(8) - 3 + i * 2.4;
+  const cx = GANTRY_CX - 3 + i * 2.4;
   const yTop = 6;
   const yBot = PLATFORM_Y - 1;
   return {
