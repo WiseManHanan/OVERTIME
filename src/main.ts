@@ -172,6 +172,7 @@ function viewFor(screen: Screen): PanelView {
     contrast: batteryContrast(state.battery),
     blackout,
     hideBackdrop: state.phase === "mediation",
+    brightFloor: state.modifier === "nightShift" ? state.pip.floor : null,
   };
 }
 
@@ -232,7 +233,11 @@ function startLoop(): void {
       dirty = true;
     }
     if (dirty) {
-      playFirst(cues);
+      // SILENT RUNNING (doc §6.3): the round plays out mute — the Steward
+      // still mimes his commentary (scene.ts's mood art needs no sound to
+      // read), this just holds the beeper back. Doesn't touch the persisted
+      // mute setting; it's a round-long thing, not a preference.
+      if (state.modifier !== "silentRunning") playFirst(cues);
       syncHints();
       paint();
     }

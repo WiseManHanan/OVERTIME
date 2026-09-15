@@ -9,7 +9,7 @@
  * The run is a small state machine: title -> playing -> cleared -> playing ...
  * with `over` as a trap state (main.ts turns an A press there into a fresh run).
  */
-import type { GameState, Pip, PipPose } from "./state";
+import type { GameState, InputAction, Pip, PipPose } from "./state";
 import {
   BOLT_RELEASE_TICKS,
   BRUNO_MAX_SLOT,
@@ -30,6 +30,7 @@ import {
   freshPip,
   isAirborne,
 } from "./state";
+export type { InputAction } from "./state";
 import {
   floorAbove,
   floorBelow,
@@ -65,8 +66,7 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-
-export type InputAction = "left" | "right" | "up" | "down" | "a";
+import { MODIFIER_ANNOUNCE_TICKS, rollModifier, type Modifier } from "./modifiers";
 
 /** Air-ticks a jump lasts in total (doc §5.2: "airborne for 2 ticks"). */
 const JUMP_AIR_TICKS = 2;
@@ -109,6 +109,7 @@ function movePip(
   input: InputAction | null,
   bolts: readonly boolean[],
   effects: GrievanceEffects,
+  modifier: Modifier | null,
 ): PipStep {
   let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo } = p;
   let pose: PipPose = "stand";
@@ -166,6 +167,13 @@ function movePip(
       if (isStandable(floor, target, effects.gapClosed)) {
         slot = target;
         pose = "walk";
+        // GREASED (doc §6.3): every floor is a coffee-cup slick — a step
+        // carries an extra slot the same direction, falling back to just
+        // the one step if the far side isn't somewhere Pip could stand.
+        if (modifier === "greased") {
+          const slideTo = slot + dir;
+          if (isStandable(floor, slideTo, effects.gapClosed)) slot = slideTo;
+        }
       }
       break;
     }
@@ -228,17 +236,22 @@ function movePip(
 /* ---- phases --------------------------------------------------------------- */
 
 function stepTitle(state: GameState, input: InputAction | null): GameState {
-  const { pip } = movePip(state.pip, input, state.bolts, effectsFor(state.concessions));
+  const { pip } = movePip(state.pip, input, state.bolts, effectsFor(state.concessions), null);
   const moved = pip.floor !== state.pip.floor || pip.slot !== state.pip.slot;
   if (!moved) {
     return { ...state, tick: state.tick + 1, pip };
   }
   const params = roundParams(state.round);
+  const roll = rollModifier(state.rng); // round 1's modifier (doc §6.3)
   return {
     ...state,
     tick: state.tick + 1,
     phase: "playing",
     pip,
+    rng: roll.rng,
+    modifier: roll.modifier,
+    modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
+    deadColumn: roll.deadColumn,
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
     playingSince: state.tick + 1, // round 1 clock windows start now
@@ -283,6 +296,15 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const brunoHere = roundTick >= cp.brunoAwayUntil + effects.brunoPauseTicks || nightAwake;
   const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
   const params = roundParams(effRound);
+  // CAFFEINATED (doc §6.3): Bruno swipes twice as often; hazard cadence is
+  // untouched (params.hazardCadence is read directly, unmodified, below).
+  const swipeCadence =
+    state.modifier === "caffeinated" ? Math.max(1, Math.round(params.swipeCadence / 2)) : params.swipeCadence;
+  // STICKY PAD (doc §6.3): the buffer's usual one-tick delay doubles to two —
+  // this tick acts on last tick's input, and this tick's own input waits one
+  // more tick behind it.
+  const effectiveInput = state.modifier === "stickyPad" ? state.queuedInput : input;
+  const queuedInput = state.modifier === "stickyPad" ? input : null;
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -305,12 +327,22 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   // 1 — Pip
-  const outcome = movePip(state.pip, input, state.bolts, effects);
+  const outcome = movePip(state.pip, effectiveInput, state.bolts, effects, state.modifier);
   let pip = outcome.pip;
   let bolts = state.bolts;
+  let boltProgress = state.boltProgress;
   const hauled = outcome.releasedBolt >= 0; // a lever came down this tick
   if (hauled) {
-    bolts = bolts.map((b, i) => (i === outcome.releasedBolt ? true : b));
+    // DOUBLE BOLTS (doc §6.3): each lever needs two hauls, not one, before it
+    // actually flips to released — the console still only ever shows real
+    // completions, so no new art for the extra pull.
+    const bi = outcome.releasedBolt;
+    const needed = state.modifier === "doubleBolts" ? 2 : 1;
+    const progress = (boltProgress[bi] ?? 0) + 1;
+    boltProgress = boltProgress.map((p, i) => (i === bi ? progress : p));
+    if (progress >= needed) {
+      bolts = bolts.map((b, i) => (i === bi ? true : b));
+    }
     rawPoints += POINTS_PER_BOLT;
   }
 
@@ -321,7 +353,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     Resolved before the haul warps Pip away, so the swing still lands.
   // While Bruno is away the countdown is held at full, so on his return there is
   // always a fresh cadence — including the windup — before the first swing.
-  let swipeCountdown = brunoHere ? state.swipeCountdown - 1 : params.swipeCadence;
+  let swipeCountdown = brunoHere ? state.swipeCountdown - 1 : swipeCadence;
   let swipe = Math.max(0, state.swipe - 1);
   if (brunoHere && swipeCountdown === 1) {
     swipe = 2; // windup: arm out, no hit yet
@@ -329,7 +361,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   if (swipeCountdown <= 0) {
     // Recognition Programme: he's "visibly emotional and unpredictable" —
     // each fresh cadence jitters ±3 ticks around the table value (doc §7.2).
-    let cadence = params.swipeCadence;
+    let cadence = swipeCadence;
     if (effects.swipeJitter) {
       const [j, r2] = nextInt(rng, 7); // 0..6 -> -3..+3
       rng = r2;
@@ -355,7 +387,10 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
           (last, b, i) => (b === true && i !== outcome.releasedBolt ? i : last),
           -1,
         );
-        if (bi >= 0) bolts = bolts.map((b, i) => (i === bi ? false : b));
+        if (bi >= 0) {
+          bolts = bolts.map((b, i) => (i === bi ? false : b));
+          boltProgress = boltProgress.map((p, i) => (i === bi ? 0 : p)); // DOUBLE BOLTS: starts over
+        }
       }
     }
   }
@@ -525,12 +560,16 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     clearedCountdown = ROUND_CLEARED_TICKS;
     // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
     const clearMult = state.clock === "night" && nightWoken ? 1 : cp.clearMult;
-    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult;
+    // DOUBLE BOLTS doubles the clear bonus too, not just the haul count.
+    const modMult = state.modifier === "doubleBolts" ? 2 : 1;
+    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult * modMult;
   }
 
   const score =
     state.score +
     awardPoints(rawPoints, boredom, stewardAsleep, cp.points * effects.pointsMult);
+
+  const modifierAnnounceTicks = Math.max(0, state.modifierAnnounceTicks - 1);
 
   return {
     ...state,
@@ -542,6 +581,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     pip,
     hazards: survivors,
     bolts,
+    boltProgress,
     brunoSlot,
     brunoDir,
     spawnCountdown,
@@ -552,6 +592,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     glitchTicks,
     glitchCooldown,
     glitchPose,
+    modifierAnnounceTicks,
+    queuedInput,
     moveStreak,
     nightNoise,
     nightWoken,
@@ -651,6 +693,10 @@ function beginNextRound(state: GameState): GameState {
     stuckLit = l;
   }
 
+  // A fresh modifier every round (doc §6.3) — repeats across rounds allowed.
+  const roll = rollModifier(rng);
+  rng = roll.rng;
+
   return {
     ...state,
     tick: state.tick + 1,
@@ -664,6 +710,7 @@ function beginNextRound(state: GameState): GameState {
     pip: freshPip(),
     hazards: [],
     bolts: state.bolts.map(() => false),
+    boltProgress: state.boltProgress.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
     spawnCountdown: params.hazardCadence,
@@ -680,5 +727,9 @@ function beginNextRound(state: GameState): GameState {
     moveStreak: 0,
     nightNoise: 0,
     nightWoken: false, // a fresh round is a fresh chance to sneak past him
+    modifier: roll.modifier,
+    modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
+    deadColumn: roll.deadColumn,
+    queuedInput: null,
   };
 }

@@ -15,9 +15,14 @@ import type { ClockMode } from "./clock";
 import type { StuckPose } from "./battery";
 import type { Hazard } from "./hazards";
 import type { ConcessionId } from "./grievance";
+import type { Modifier } from "./modifiers";
 
 export type Facing = -1 | 1;
 export type PipPose = "stand" | "walk" | "climb" | "duck" | "jump" | "release";
+/** A single tick's action, drained from the one-slot input buffer (doc §4.4).
+ *  Lives here, not step.ts, so GameState (STICKY PAD's queued input) can
+ *  reference it without step.ts <-> state.ts becoming circular. */
+export type InputAction = "left" | "right" | "up" | "down" | "a";
 
 /** The run's overall state machine. `mediation` is the grievance interlude
  *  (doc §7.2) — play is paused while the Steward presents concession cards. */
@@ -61,6 +66,10 @@ export interface GameState {
    *  holders at the platform's free end; all four out and the platform pivots
    *  off its anchor — Bruno goes down, the round clears (doc §5.5). */
   bolts: readonly boolean[];
+  /** Hauls banked per holder so far. Normally a single haul is enough (matches
+   *  `bolts` one-for-one); DOUBLE BOLTS (doc §6.3) needs two per lever before
+   *  it flips to released — the console still shows only real completions. */
+  boltProgress: readonly number[];
   /** The slot Bruno is pacing over on his girder (doc §5.5). */
   brunoSlot: number;
   /** Which way Bruno is pacing; flips at the ends of his beat. */
@@ -125,6 +134,17 @@ export interface GameState {
   /** The mismatched pose the glitch tick lights, chosen when it fires.
    *  Meaningless while glitchTicks is 0. */
   glitchPose: PipPose | null;
+  /** This round's modifier (doc §6.3), drawn fresh every round — repeats
+   *  across rounds are allowed. `null` only before round 1 ever starts. */
+  modifier: Modifier | null;
+  /** Ticks left on the 14-segment announcement banner. */
+  modifierAnnounceTicks: number;
+  /** DEAD COLUMN's slot (every floor), or `null` any other round. */
+  deadColumn: number | null;
+  /** STICKY PAD (doc §6.3): the input from last tick, applied this tick
+   *  instead — doubling the buffer's usual one-tick delay to two. `null` and
+   *  unused any round STICKY PAD isn't in effect. */
+  queuedInput: InputAction | null;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -201,6 +221,7 @@ export function initialState(
     pip: freshPip(),
     hazards: [],
     bolts: BOLT_SLOTS.map(() => false),
+    boltProgress: BOLT_SLOTS.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
     spawnCountdown: first.hazardCadence,
@@ -226,6 +247,10 @@ export function initialState(
     glitchTicks: 0,
     glitchCooldown: 0,
     glitchPose: null,
+    modifier: null,
+    modifierAnnounceTicks: 0,
+    deadColumn: null,
+    queuedInput: null,
   };
 }
 

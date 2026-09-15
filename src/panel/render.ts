@@ -33,11 +33,28 @@ export interface PanelView {
    *  is art too, and a bold girder line was crossing straight through the
    *  card copy once the backdrop stopped being faint enough to ignore. */
   hideBackdrop?: boolean;
+  /** NIGHT SHIFT (doc §6.3): Pip's current floor, or `null`/absent any other
+   *  round. When set, the lit pass splits in two — everything on this floor
+   *  draws at full contrast, everything else at NIGHT_SHIFT_DIM. */
+  brightFloor?: number | null;
   /** Power-on self-test: light every segment regardless of `lit` (doc §9.1). */
   selfTest?: boolean;
 }
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+/** -40% contrast on everything outside Pip's current floor (doc §6.3). */
+const NIGHT_SHIFT_DIM = 0.6;
+
+// Only these three kinds carry a floor in their id (doc §4.3's atlas ids) —
+// Bruno, the console, holders and the Steward have no floor of their own and
+// default to the dimmed pass.
+const FLOOR_ID = /^(?:pip|barrel|chair)\.f(\d+)\./;
+
+function segFloor(id: string): number | null {
+  const m = FLOOR_ID.exec(id);
+  return m ? Number(m[1]) : null;
+}
 
 export function renderPanel(
   ctx: CanvasRenderingContext2D,
@@ -71,9 +88,27 @@ export function renderPanel(
   const blackout = view.blackout === true && !selfTest;
   if (!blackout) {
     ctx.fillStyle = pal.segment;
-    ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
-    for (const seg of segs) {
-      if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
+    const brightFloor = view.brightFloor ?? null;
+    if (brightFloor === null) {
+      ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
+      for (const seg of segs) {
+        if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
+      }
+    } else {
+      // NIGHT SHIFT: dimmed pass first, then Pip's own floor at full contrast —
+      // same segment set, two alpha passes, each segment drawn exactly once.
+      ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast * NIGHT_SHIFT_DIM);
+      for (const seg of segs) {
+        if ((selfTest || view.lit.has(seg.id)) && segFloor(seg.id) !== brightFloor) {
+          ctx.fill(pathForSeg(seg));
+        }
+      }
+      ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
+      for (const seg of segs) {
+        if ((selfTest || view.lit.has(seg.id)) && segFloor(seg.id) === brightFloor) {
+          ctx.fill(pathForSeg(seg));
+        }
+      }
     }
   }
 
