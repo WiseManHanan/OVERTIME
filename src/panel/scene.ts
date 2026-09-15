@@ -57,12 +57,8 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
       lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 5)))}`);
     } else if (state.phase === "mediation") {
-      // He stops pacing and sits down right where he was — the platform holds
-      // (doc §7.2: the interlude replaces the round's usual collapse, since
-      // he stopped it before the platform tipped).
-      lit.add(`bruno.sit.s${state.brunoSlot}`);
-      lit.add("bruno.platform");
-      lit.add("gantry");
+      // Bruno and the platform step out of the way entirely — his grievance
+      // reads clean, with nothing behind it (doc §7.2).
     } else {
       const face = state.brunoDir === 1 ? "r" : "l";
       const pose = state.swipe > 0 ? "swipe" : "pace";
@@ -96,17 +92,26 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       const chosen = state.mediationCards[state.mediationSelected];
       const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
       if (card) {
-        texts.push({ text: card.grievance, x: PANEL_W / 2, y: 28, cell: 5, kind: "seg14", align: "center" });
+        // Dead centre of the screen — with Bruno and the platform out of the
+        // way above, there's nothing left to compete with it. Two short
+        // pre-broken lines (grievance.ts) hold a legible cell size without
+        // either one clipping the panel's edge.
+        const [line1, line2] = card.grievance;
+        texts.push({ text: line1, x: PANEL_W / 2, y: 36, cell: 7, kind: "seg14", align: "center" });
+        if (line2) {
+          texts.push({ text: line2, x: PANEL_W / 2, y: 50, cell: 7, kind: "seg14", align: "center" });
+        }
       }
     }
   }
 
   if (screen === "lower") {
-    // The Steward is always on his mark; his pose tracks the boredom meter —
-    // except during mediation, where he's presenting cards, not judging play.
-    lit.add(
-      `steward.${state.phase === "mediation" ? "idle" : stewardMood(state.boredom, state.stewardAsleep)}`,
-    );
+    // The Steward is always on his mark, pose tracking the boredom meter —
+    // except during mediation, where the card text stands alone and every
+    // character steps aside for it.
+    if (state.phase !== "mediation") {
+      lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+    }
 
     if (state.phase === "playing" || state.phase === "cleared") {
       const filled = Math.round((state.boredom / BOREDOM_MAX) * 10);

@@ -28,8 +28,12 @@ export interface ConcessionCard {
   /** What Bruno gets in return, one line. */
   brunoGains: string;
   /** Bruno's sincere, specific complaint behind this card (doc §7.2: "the
-   *  comedy is in his being right" — never a punchline at his expense). */
-  grievance: string;
+   *  comedy is in his being right" — never a punchline at his expense).
+   *  Pre-broken into two short lines — each one comfortably fits the panel
+   *  at a legible cell size; a single line long enough to need one would
+   *  either clip or force the text down to unreadable. The second line is
+   *  `""` where the whole complaint already fits on one. */
+  grievance: readonly [string, string];
 }
 
 export const CONCESSION_CARDS: readonly ConcessionCard[] = [
@@ -38,42 +42,42 @@ export const CONCESSION_CARDS: readonly ConcessionCard[] = [
     title: "LONGER BREAKS",
     youGain: "BRUNO OFF 20T EACH ROUND",
     brunoGains: "THROWS 2X WHEN ACTIVE",
-    grievance: "TWO BREAKS ISN'T A LUNCH HOUR",
+    grievance: ["TWO BREAKS ISN'T A", "LUNCH HOUR"],
   },
   {
     id: "ergonomicAssessment",
     title: "ERGONOMICS",
     youGain: "JUMP CLEARS 2 SLOTS",
     brunoGains: "SWIPE REACHES 1 FARTHER",
-    grievance: "MY SHOULDER FILED ITS OWN GRIEVANCE",
+    grievance: ["MY SHOULDER FILED", "ITS OWN GRIEVANCE"],
   },
   {
     id: "overtimePay",
     title: "OVERTIME PAY",
     youGain: "ALL POINTS PAY 1.4X",
     brunoGains: "HE MOVES AT 1.15X",
-    grievance: "NO WEEKEND SINCE MARCH",
+    grievance: ["NO WEEKEND", "SINCE MARCH"],
   },
   {
     id: "safetyRailing",
     title: "SAFETY RAILING",
     youGain: "FLOOR 2 GAP CLOSES",
     brunoGains: "LADDERS TAKE 2 TICKS",
-    grievance: "THAT GAP MADE THE REPORT TWICE",
+    grievance: ["THAT GAP MADE THE", "REPORT TWICE"],
   },
   {
     id: "trainingBudget",
     title: "TRAINING BUDGET",
     youGain: "1 EXTRA MISS ALLOWED",
     brunoGains: "BOLTS TAKE 5 TICKS",
-    grievance: "NOBODY SHOWED ME THE BOLTS EITHER",
+    grievance: ["NOBODY SHOWED ME", "THE BOLTS EITHER"],
   },
   {
     id: "recognitionProgramme",
     title: "RECOGNITION",
     youGain: "NEAR MISS PAYS 2X",
     brunoGains: "HIS SWIPE TIMING WOBBLES",
-    grievance: "TWENTY YEARS. NOT ONE PLAQUE.",
+    grievance: ["TWENTY YEARS.", "NOT ONE PLAQUE."],
   },
 ];
 

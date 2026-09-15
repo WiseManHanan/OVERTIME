@@ -381,46 +381,6 @@ function brunoSwipeShapes(cx: number): Shape[] {
   ];
 }
 
-/** Bruno stops pacing and sits down, arms folded — the grievance interlude's
- *  opening beat (doc §7.2). A static pose, compressed and settled: the hat and
- *  head drop with the seated posture, the fold is still, and the wide standing
- *  stance gives way to flat thighs and shins down to the platform deck. */
-function brunoSitShapes(cx: number): Shape[] {
-  const b = PLATFORM_Y;
-  return [
-    // hat + head, same silhouette as standing but sitting a touch lower
-    poly([
-      [cx + 5, b - 15.6],
-      [cx + 4.4, b - 17.6],
-      [cx + 1.6, b - 18.4],
-      [cx - 3.6, b - 18],
-      [cx - 5.4, b - 16.8],
-      [cx - 7, b - 15.4],
-      [cx - 7, b - 14.4],
-      [cx - 5, b - 14],
-      [cx + 4.8, b - 14.2],
-    ]),
-    poly([
-      [cx + 3.4, b - 13.6],
-      [cx - 3.2, b - 13.6],
-      [cx - 5, b - 12.4],
-      [cx - 3.2, b - 11.4],
-      [cx - 5, b - 10.4],
-      [cx - 3, b - 9.2],
-      [cx - 3.8, b - 7.2],
-      [cx + 3.2, b - 7.4],
-    ]),
-    // folded arms, at rest — no bob, the sulk holds still
-    poly([[cx - 5.4, b - 6.4], [cx - 0.7, b - 5.9], [cx - 0.5, b - 4], [cx - 5.2, b - 4.4]]),
-    poly([[cx + 0.4, b - 6.7], [cx + 5.4, b - 6.2], [cx + 5.2, b - 4.2], [cx + 0.2, b - 4.5]]),
-    // belly, seated — shorter than the standing block
-    poly([[cx - 5, b - 3.4], [cx + 5, b - 3.4], [cx + 4.6, b - 1.6], [cx - 4.6, b - 1.6]]),
-    // thighs flat, shins down to the deck — the seated silhouette
-    poly([[cx - 6, b - 1.6], [cx - 1, b - 1.6], [cx - 0.6, b], [cx - 6.4, b]]),
-    poly([[cx + 1, b - 1.6], [cx + 6, b - 1.6], [cx + 6.4, b], [cx + 0.6, b]]),
-  ];
-}
-
 /** Anchor x of the platform (its west pivot, bolted to the side of the screen)
  *  and its free (east) end. */
 const PLATFORM_WEST = 3;
@@ -712,8 +672,6 @@ function build(): Seg[] {
 
   // Bruno paces slots BRUNO_MIN_SLOT..BRUNO_MAX_SLOT, facing his direction of
   // travel. Pace poses ghost; the transient swing does not (see Seg.noGhost).
-  // The sit pose (grievance interludes, doc §7.2) is symmetric enough that one
-  // orientation covers both facings — no separate mirror needed.
   for (let s = BRUNO_MIN_SLOT; s <= BRUNO_MAX_SLOT; s++) {
     const cx = slotCenterX(s);
     const paceL = brunoPaceShapes(cx, s % 2);
@@ -722,7 +680,6 @@ function build(): Seg[] {
     segs.push({ id: `bruno.pace.s${s}.r`, screen: "upper", shapes: mirror(paceL, cx) });
     segs.push({ id: `bruno.swipe.s${s}.l`, screen: "upper", shapes: swipeL, noGhost: true });
     segs.push({ id: `bruno.swipe.s${s}.r`, screen: "upper", shapes: mirror(swipeL, cx), noGhost: true });
-    segs.push({ id: `bruno.sit.s${s}`, screen: "upper", shapes: brunoSitShapes(cx) });
   }
   for (let k = 0; k < 4; k++) {
     segs.push({
