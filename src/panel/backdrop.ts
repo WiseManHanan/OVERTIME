@@ -29,6 +29,50 @@ export function drawBackdrop(ctx: CanvasRenderingContext2D, screen: Screen, pal:
   ctx.restore();
 }
 
+/** Every plate() ever draws the same handful of (baselineY, gaps) shapes —
+ *  each floor's girder is fixed geometry, never a function of GameState. Built
+ *  once per shape and reused, the same "build a Path2D once, per-frame work is
+ *  only fill()/stroke()" rule the segment atlas follows (atlas.ts). */
+const trussCache = new Map<string, Path2D>();
+
+function trussPath(baselineY: number, gaps: ReadonlyArray<readonly [number, number]>): Path2D {
+  const key = `${baselineY}:${gaps.map((g) => g.join(",")).join("|")}`;
+  const cached = trussCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const yTop = baselineY;
+  const yBot = baselineY + 5;
+  const railH = 1.6;
+  // Full bleed to both screen edges — a girder that stops short of the bezel
+  // reads as afloat, not bolted to anything.
+  let x = 0;
+  const end = PANEL_W;
+  const spans: [number, number][] = [];
+  for (const [gx0, gx1] of gaps) {
+    if (gx0 > x) spans.push([x, gx0]);
+    x = Math.max(x, gx1);
+  }
+  if (end > x) spans.push([x, end]);
+
+  const path = new Path2D();
+  for (const [sx0, sx1] of spans) {
+    path.rect(sx0, yTop, sx1 - sx0, railH);
+    path.rect(sx0, yBot, sx1 - sx0, railH);
+
+    const step = 6;
+    let up = true;
+    for (let cx = sx0; cx < sx1; cx += step) {
+      const y0 = up ? yTop : yBot;
+      const y1 = up ? yBot : yTop;
+      path.moveTo(cx, y0);
+      path.lineTo(Math.min(cx + step, sx1), y1);
+      up = !up;
+    }
+  }
+  trussCache.set(key, path);
+  return path;
+}
+
 /**
  * A floor girder: top and bottom rail with a diagonal cross-brace lattice
  * between them, the way a printed steel truss reads on the real hardware —
@@ -44,37 +88,10 @@ function plate(
   ctx.globalAlpha = STRUCTURE_ALPHA;
   ctx.fillStyle = pal.printRed;
   ctx.strokeStyle = pal.printRed;
-  const yTop = baselineY;
-  const yBot = baselineY + 5;
-  const railH = 1.6;
-  // Full bleed to both screen edges — a girder that stops short of the bezel
-  // reads as afloat, not bolted to anything.
-  let x = 0;
-  const end = PANEL_W;
-  const spans: [number, number][] = [];
-  for (const [gx0, gx1] of gaps) {
-    if (gx0 > x) spans.push([x, gx0]);
-    x = Math.max(x, gx1);
-  }
-  if (end > x) spans.push([x, end]);
-
-  for (const [sx0, sx1] of spans) {
-    ctx.fillRect(sx0, yTop, sx1 - sx0, railH);
-    ctx.fillRect(sx0, yBot, sx1 - sx0, railH);
-
-    const step = 6;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    let up = true;
-    for (let cx = sx0; cx < sx1; cx += step) {
-      const y0 = up ? yTop : yBot;
-      const y1 = up ? yBot : yTop;
-      ctx.moveTo(cx, y0);
-      ctx.lineTo(Math.min(cx + step, sx1), y1);
-      up = !up;
-    }
-    ctx.stroke();
-  }
+  ctx.lineWidth = 1.4;
+  const path = trussPath(baselineY, gaps);
+  ctx.fill(path); // the two rails
+  ctx.stroke(path); // the cross-braces (the rails' outline strokes too, invisibly — same fill colour)
 }
 
 /** Vertical ladder centred on `slot`, spanning the two given y's (any order). */
