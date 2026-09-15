@@ -146,6 +146,24 @@ describe("misses and game over (doc §5.6)", () => {
     expect(s.pip.pose).toBe("stand");
   });
 
+  it("a survived hit also sweeps every hazard still on the board", () => {
+    // One barrel hits Pip; another, elsewhere on the board, survives the tick.
+    let s = at(
+      quietPlaying({ hazards: [mkBarrel(1, 2, 1), mkBarrel(3, 8, 1)] }),
+      1,
+      3,
+    );
+    s = step(s, null); // barrel 2 -> 3, onto Pip; the other barrel just rolls on
+    expect(s.hitFlash).toBe(HIT_FLASH_TICKS);
+    expect(s.hazards.length).toBe(1); // the survivor is still out there, frozen in place
+    for (let i = 0; i < HIT_FLASH_TICKS - 1; i++) {
+      s = step(s, null);
+      expect(s.hazards.length).toBe(1); // untouched through the freeze
+    }
+    s = step(s, null); // the last frozen tick
+    expect(s.hazards).toEqual([]); // swept, same as a haul
+  });
+
   it("jumping over a barrel is not a miss", () => {
     let s = quietPlaying({ hazards: [mkBarrel(1, 5, -1)] });
     s = { ...at(s, 1, 3), pip: { ...s.pip, floor: 1, slot: 3, facing: 1 } };
