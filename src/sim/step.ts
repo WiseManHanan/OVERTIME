@@ -251,7 +251,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // Pip blinks (scene.ts reads hitFlash for that). The tick this reaches 0 is
   // also where a fatal hit's GAME OVER actually lands, so the blink always
   // finishes playing before the results screen cuts in; a survived hit sends
-  // Pip back to the start once it's done, same as a successful bolt haul.
+  // Pip back to the start and sweeps the stage once it's done, same reset a
+  // successful bolt haul gets.
   if (state.hitFlash > 0) {
     const hitFlash = state.hitFlash - 1;
     const effects0 = effectsFor(state.concessions);
@@ -260,7 +261,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       if (state.misses >= missesAllowed0) {
         return { ...state, tick: state.tick + 1, hitFlash, phase: "over" };
       }
-      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip() };
+      // Same reset a haul gets (doc §5.5): the stage is swept clear too, not
+      // just Pip — everything Bruno had thrown goes with him back to zero.
+      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip(), hazards: [] };
     }
     return {
       ...state,
