@@ -76,9 +76,10 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   if (screen === "upper" && showArt) {
     if (state.phase === "cleared") {
       // Last holder pulled: the platform pivots off its anchor and takes Bruno
-      // with it, across the ROUND CLEARED window (doc §5.5).
+      // with it, across the ROUND CLEARED window (doc §5.5). 2 ticks/frame —
+      // quick, now that the base tick itself runs slower than it used to.
       const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
-      lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 5)))}`);
+      lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 2)))}`);
     } else {
       const face = state.brunoDir === 1 ? "r" : "l";
       const pose = state.swipe > 0 ? "swipe" : "pace";
