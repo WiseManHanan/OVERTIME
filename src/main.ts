@@ -169,6 +169,7 @@ function viewFor(screen: Screen): PanelView {
     texts: scene.texts,
     contrast: batteryContrast(state.battery),
     blackout,
+    hideBackdrop: state.phase === "mediation",
   };
 }
 
