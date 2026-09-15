@@ -4,9 +4,9 @@
  * ids and on-panel text, nothing more.
  */
 import type { GameState } from "../sim/state";
-import { HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
+import { GLITCH_TICKS, HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
 import { sameCell } from "../sim/battery";
-import { BOLT_SLOTS, floorScreen } from "../sim/world";
+import { BOLT_SLOTS, floorScreen, isStandable } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import { CONCESSION_CARDS } from "../sim/grievance";
 import type { Screen } from "./types";
@@ -45,7 +45,20 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   if (showArt && !blinkedOut && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
-      lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
+      const face = p.facing === 1 ? "r" : "l";
+      if (state.glitchTicks === GLITCH_TICKS && state.glitchPose) {
+        // Segment awareness (doc §7.4): the wrong pose lights for this one
+        // tick — "an arm where a leg should be," at our whole-pose grain.
+        lit.add(`pip.f${p.floor}.s${p.slot}.${state.glitchPose}.${face}`);
+      } else if (state.glitchTicks === 1) {
+        // ...then a one-slot "shake" on his next, correct pose. Falls back
+        // to no shake if the neighbouring slot isn't one Pip could stand in.
+        const jitterSlot = p.slot - p.facing;
+        const shakeSlot = isStandable(p.floor, jitterSlot, true) ? jitterSlot : p.slot;
+        lit.add(`pip.f${p.floor}.s${shakeSlot}.${p.pose}.${face}`);
+      } else {
+        lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${face}`);
+      }
     }
   }
   // ...and a phantom pose stuck lit where nobody is (doc §7.3).

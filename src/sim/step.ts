@@ -17,6 +17,10 @@ import {
   BRUNO_PACE_TICKS,
   BRUNO_SLOT,
   CONSOLE_SLOT,
+  GLITCH_CHANCE,
+  GLITCH_COOLDOWN_TICKS,
+  GLITCH_POSES,
+  GLITCH_TICKS,
   HIT_FLASH_TICKS,
   MISSES_ALLOWED,
   POINTS_PER_BOLT,
@@ -54,7 +58,7 @@ import {
   nextAsleep,
   nextBoredom,
 } from "./scoring";
-import { nextInt } from "./rng";
+import { nextFloat, nextInt } from "./rng";
 import {
   drawConcessionCards,
   effectsFor,
@@ -445,6 +449,28 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     spawnCountdown = params.hazardCadence;
   }
 
+  // 5b — segment awareness (doc §7.4): roughly once per 400 ticks the wrong
+  //      Pip segment lights for one tick, then a one-slot "shake" the next.
+  //      Never twice within 200 ticks, so the roll only happens once both the
+  //      previous glitch and its cooldown have fully run out.
+  let glitchTicks = state.glitchTicks > 0 ? state.glitchTicks - 1 : 0;
+  let glitchCooldown = state.glitchCooldown > 0 ? state.glitchCooldown - 1 : 0;
+  let glitchPose = state.glitchPose;
+  if (state.glitchTicks === 0 && state.glitchCooldown === 0) {
+    const [roll, r2] = nextFloat(rng);
+    rng = r2;
+    if (roll < GLITCH_CHANCE) {
+      // Excludes Pip's actual current pose — showing the same pose "wrong"
+      // wouldn't read as a glitch at all.
+      const candidates = GLITCH_POSES.filter((gp) => gp !== pip.pose);
+      const [poseIdx, r3] = nextInt(rng, candidates.length);
+      rng = r3;
+      glitchTicks = GLITCH_TICKS;
+      glitchCooldown = GLITCH_COOLDOWN_TICKS;
+      glitchPose = candidates[poseIdx]!;
+    }
+  }
+
   // 6 — the boredom meter (doc §6.2). It fills while Pip is passive and drains
   //     on the plays that read as skilled; nothing here touches the wall clock.
   let ticksSinceFloorChange = state.ticksSinceFloorChange + 1;
@@ -520,6 +546,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipe,
     clearedCountdown,
     hitFlash,
+    glitchTicks,
+    glitchCooldown,
+    glitchPose,
     moveStreak,
     nightNoise,
     nightWoken,
