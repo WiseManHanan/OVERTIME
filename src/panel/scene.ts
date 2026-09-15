@@ -99,10 +99,6 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
 
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
 
-    // Mara, at the top — on the phone, off-grid past the west edge (doc
-    // §5.1). Always there, regardless of what Bruno's doing.
-    lit.add("mara");
-
     // The east lift (doc §7.4): appears from round 5, a call button lit and
     // pending; round 10, the car finally arrives, then goes straight back
     // down, and it's done for the rest of the run — button dark, car gone.
@@ -125,12 +121,6 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
-    }
-
-    // Mara's verdict on the miss that just happened (doc §7.4) — in
-    // 7-segment, since it's a number, not a word.
-    if (state.maraRatingTicks > 0 && state.maraRating !== null && state.phase !== "mediation") {
-      texts.push({ text: String(state.maraRating), x: 14, y: 26, cell: 7, kind: "seg7", align: "left" });
     }
 
     if (state.phase === "mediation") {

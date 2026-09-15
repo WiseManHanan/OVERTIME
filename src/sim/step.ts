@@ -65,7 +65,6 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-import { MARA_RATING_TICKS, rollMaraRating } from "./mara";
 
 export type InputAction = "left" | "right" | "up" | "down" | "a";
 
@@ -255,20 +254,18 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // Pip back to the start once it's done, same as a successful bolt haul.
   if (state.hitFlash > 0) {
     const hitFlash = state.hitFlash - 1;
-    const maraRatingTicks = Math.max(0, state.maraRatingTicks - 1);
     const effects0 = effectsFor(state.concessions);
     const missesAllowed0 = MISSES_ALLOWED + effects0.extraMisses;
     if (hitFlash === 0) {
       if (state.misses >= missesAllowed0) {
-        return { ...state, tick: state.tick + 1, hitFlash, maraRatingTicks, phase: "over" };
+        return { ...state, tick: state.tick + 1, hitFlash, phase: "over" };
       }
-      return { ...state, tick: state.tick + 1, hitFlash, maraRatingTicks, pip: freshPip() };
+      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip() };
     }
     return {
       ...state,
       tick: state.tick + 1,
       hitFlash,
-      maraRatingTicks,
       swipe: Math.max(0, state.swipe - 1), // let a mid-swing arm settle, as stepCleared does
     };
   }
@@ -510,8 +507,6 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
   let hitFlash = 0;
-  let maraRating = state.maraRating;
-  let maraRatingTicks = Math.max(0, state.maraRatingTicks - 1);
   if (tookMiss) {
     // Pause and blink first (doc-independent tuning, see HIT_FLASH_TICKS) —
     // phase stays "playing" even if this was the hit that ends the run; the
@@ -520,12 +515,6 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     // any) is deferred the same way — bolts stay released, so the next
     // unfrozen tick catches it.
     hitFlash = HIT_FLASH_TICKS;
-    // Mara's verdict, every miss (doc §7.4) — a fresh roll replaces whatever
-    // rating was still fading from a previous one.
-    const [rating, r2] = rollMaraRating(rng);
-    rng = r2;
-    maraRating = rating;
-    maraRatingTicks = MARA_RATING_TICKS;
   } else if (bolts.every((b) => b)) {
     // The platform still falls the ordinary way (doc §5.5) — a grievance
     // interlude, if this round earns one, waits for that to finish (stepCleared).
@@ -557,8 +546,6 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipe,
     clearedCountdown,
     hitFlash,
-    maraRating,
-    maraRatingTicks,
     glitchTicks,
     glitchCooldown,
     glitchPose,

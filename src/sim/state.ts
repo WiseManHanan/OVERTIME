@@ -115,10 +115,6 @@ export interface GameState {
    *  `> 0` pauses everything else in `stepPlaying` (Bruno, hazards, scoring —
    *  a bare tick/countdown decrement) while Pip blinks; 0 is normal play. */
   hitFlash: number;
-  /** Mara's rating (1-10) for the most recent miss (doc §7.4), or `null`
-   *  before the first one. Shown near her while `maraRatingTicks > 0`. */
-  maraRating: number | null;
-  maraRatingTicks: number;
   /** Segment awareness (doc §7.4): 2 while the "wrong segment" glitch is
    *  active (2 = the mismatched pose lights, 1 = a one-slot "shake"), 0
    *  otherwise. */
@@ -227,8 +223,6 @@ export function initialState(
     mediationCards: [],
     mediationSelected: 0,
     hitFlash: 0,
-    maraRating: null,
-    maraRatingTicks: 0,
     glitchTicks: 0,
     glitchCooldown: 0,
     glitchPose: null,

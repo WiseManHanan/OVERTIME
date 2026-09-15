@@ -188,7 +188,7 @@ Both screens use discrete `(floor, slot)` addressing. Nothing exists between slo
 | Lower | 1 | 0–9 | Ground. Ladder to floor 2 at slot 9. Steward occupies the left margin, outside the play grid. |
 | Lower | 2 | 0–9 | Gap at slots 4–5 that must be jumped. Ladder to floor 3 at slot 0. |
 | Upper | 3 | 0–9 | Moving platform section: slots 3–6 shift one slot left/right on a 6-tick cycle. Ladder to floor 4 at slot 9. |
-| Upper | 4 | 0–9 | Bolt stations at slots 1, 3, 5, 7. Bruno's platform above slots 4–8. Mara at slot 0, off-grid. |
+| Upper | 4 | 0–9 | Bolt stations at slots 1, 3, 5, 7. Bruno's platform above slots 4–8. |
 
 ### 5.2 Verbs
 
@@ -369,7 +369,6 @@ This is a difficulty mechanic that attacks *information* rather than reflexes, w
 
 Small, cheap, high return:
 
-- **Mara's ratings.** After every miss, a number 1–10 appears near her in 7-segment. She is a harsh but fair judge. A 10 is possible and rare.
 - **The east lift.** From round 5, a printed lift shaft appears on the backdrop with a working call button that never arrives. On round 10, it arrives. It goes down.
 - **Segment awareness.** Roughly once per 400 ticks, the wrong Pip segment lights for one tick — an arm where a leg should be. Pip's next pose includes a brief shake. Never twice within 200 ticks. This should feel like a glitch the player is not sure they saw.
 
