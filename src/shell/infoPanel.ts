@@ -24,6 +24,13 @@ const TEMPLATE = `
       <li><span class="key">▼</span>Duck &mdash; or climb down, on a down-ladder slot</li>
       <li><span class="key">A</span>Jump</li>
     </ul>
+    <p class="info-console">
+      The lever panel is on floor 4, at the far right past Bruno. Stand on it
+      and hold <strong>▲</strong> &mdash; each of the four levers takes three
+      ticks to pull, and you can't move while it releases. All four down
+      drops his platform and clears the round, but linger too long and his
+      swipe can knock a lever back up.
+    </p>
     <ul class="info-hazards">
       <li><strong>Barrels</strong> roll low &mdash; jump them.</li>
       <li><strong>Chairs</strong> roll high and fast &mdash; duck them, they can't be jumped.</li>
