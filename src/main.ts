@@ -24,10 +24,11 @@ import { createBeeper, type Cue } from "./audio/beeper";
 import { loadMute, saveMute } from "./store/persist";
 import type { Screen } from "./panel/types";
 
-// Base tick at round-1 speed — 60 ticks/minute (1/sec), dramatically slower
-// than the original hardware-accurate ~5.9/sec, per playtest feedback. The
-// round speed table (doc §6.1) divides this; nothing else sets the pace.
-const BASE_TICK_MS = 1000;
+// Base tick at round-1 speed — ~3.3/sec (200/minute), eased down from the
+// original hardware-accurate ~5.9/sec but well short of 60/minute, which
+// played too slow. The round speed table (doc §6.1) divides this; nothing
+// else sets the pace.
+const BASE_TICK_MS = 300;
 const BOOT_MS = 300;
 const MAX_DPR = 3;
 const MAX_CATCHUP_TICKS = 8; // don't replay a backgrounded tab's worth of ticks
