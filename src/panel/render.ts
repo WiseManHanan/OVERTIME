@@ -29,6 +29,10 @@ export interface PanelView {
   /** A battery blackout tick (doc §7.3): the lit pass is skipped for this one
    *  frame — the panel drops to the printed backdrop while the sim runs on. */
   blackout?: boolean;
+  /** Mediation (doc §7.2) is text-only, top to bottom — the printed backdrop
+   *  is art too, and a bold girder line was crossing straight through the
+   *  card copy once the backdrop stopped being faint enough to ignore. */
+  hideBackdrop?: boolean;
   /** Power-on self-test: light every segment regardless of `lit` (doc §9.1). */
   selfTest?: boolean;
 }
@@ -49,7 +53,7 @@ export function renderPanel(
   ctx.fillRect(0, 0, PANEL_W, PANEL_H);
 
   // 2 — the printed backdrop
-  drawBackdrop(ctx, view.screen, pal);
+  if (view.hideBackdrop !== true) drawBackdrop(ctx, view.screen, pal);
 
   // 3 — every segment in the atlas, ghosted (--ghost carries its own alpha).
   // `noGhost` segments (mirrored left-facing poses, Bruno's transient frames)

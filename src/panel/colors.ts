@@ -17,7 +17,7 @@ export interface Palette {
 const FALLBACK: Palette = {
   lcdBg: "#9BAE8C",
   segment: "#2B2E27",
-  ghost: "rgba(43, 46, 39, 0.08)",
+  ghost: "rgba(43, 46, 39, 0.072)",
   printRed: "#C1443A",
   printBlue: "#3E6C9B",
   printYellow: "#D9A441",

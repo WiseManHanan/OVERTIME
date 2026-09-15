@@ -507,10 +507,15 @@ function brunoPlatformSeg(): Seg {
   };
 }
 
+/** Centred past Bruno's pacing reach (BRUNO_MAX_SLOT/CONSOLE_SLOT are both
+ *  slot 8) so the gantry and its holders read as their own fixture at the
+ *  platform's true east end, not just wherever Bruno happens to be standing. */
+const GANTRY_CX = slotCenterX(8) + 12;
+
 /** The overhead gantry the holders hang from — a fixed hook fixture at the
  *  platform's free (east) end. Always lit while the round is live. */
 function gantrySeg(): Seg {
-  const cx = slotCenterX(8);
+  const cx = GANTRY_CX;
   const top = 3;
   return {
     id: "gantry",
@@ -527,16 +532,28 @@ function gantrySeg(): Seg {
  *  end. Lit until Pip pulls it at the console; all four out and the platform
  *  pivots off its anchor — Bruno falls (doc §5.5). */
 function holderSeg(i: number): Seg {
-  const cx = slotCenterX(8) - 3 + i * 2.4;
+  const cx = GANTRY_CX - 3 + i * 2.4;
   const yTop = 6;
   const yBot = PLATFORM_Y - 1;
+  const span = yBot - yTop;
+  const linkR = 1.1;
+  // Three round links down the pin's length, each a hair wider than the
+  // connecting bar so they read as beads on a chain, not just a thick line.
+  const bead = (t: number): number => yTop + span * t;
+  const beadYs = [bead(0.22), bead(0.52), bead(0.82)];
+  const shapes: Shape[] = [];
+  let cursor = yTop;
+  for (const by of beadYs) {
+    shapes.push(rect(cx - 0.7, cursor, 1.4, by - linkR - cursor)); // bar up to the link
+    shapes.push({ k: "circle", cx, cy: by, r: linkR }); // a link
+    cursor = by + linkR;
+  }
+  shapes.push(rect(cx - 0.7, cursor, 1.4, yBot - cursor)); // bar down to the bolt-head
+  shapes.push({ k: "circle", cx, cy: yBot, r: 1.4 }); // the bolt-head on the beam
   return {
     id: `holder.s${i}`,
     screen: "upper",
-    shapes: [
-      rect(cx - 0.7, yTop, 1.4, yBot - yTop), // the pin
-      { k: "circle", cx, cy: yBot, r: 1.4 }, // the bolt-head on the beam
-    ],
+    shapes,
   };
 }
 

@@ -53,7 +53,7 @@ The design brief here is fixed by the subject matter, so follow it exactly rathe
 | `--shell-shadow` | `#A9A292` | Shell bevels, button wells, hinge |
 | `--lcd-bg` | `#9BAE8C` | Unlit LCD panel field (the greenish-grey of a 1982 TN panel) |
 | `--segment` | `#2B2E27` | Lit segment |
-| `--ghost` | `#2B2E27` at `alpha 0.08` | Unlit segment — always drawn |
+| `--ghost` | `#2B2E27` at `alpha 0.072` | Unlit segment — always drawn |
 | `--print-red` | `#C1443A` | Printed backdrop: scaffold poles, hazard stripes |
 | `--print-blue` | `#3E6C9B` | Printed backdrop: sky band, water tank |
 | `--print-yellow` | `#D9A441` | Printed backdrop: warning chevrons, Steward's bell |
