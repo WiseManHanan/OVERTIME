@@ -159,8 +159,10 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       const chosen = state.mediationCards[state.mediationSelected];
       const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
       if (card) {
-        texts.push({ text: card.youGain, x: 6, y: 60, cell: 5, kind: "seg14", align: "left" });
-        texts.push({ text: card.brunoGains, x: 6, y: 70, cell: 5, kind: "seg14", align: "left" });
+        // Cell 7 — the same size as GAME OVER's "PRESS A" — so the trade-off
+        // itself reads at a glance, not just the card's name above it.
+        texts.push({ text: card.youGain, x: 6, y: 58, cell: 7, kind: "seg14", align: "left" });
+        texts.push({ text: card.brunoGains, x: 6, y: 71, cell: 7, kind: "seg14", align: "left" });
       }
       texts.push({ text: "LEFT RIGHT A", x: PANEL_W / 2, y: 86, cell: 5, kind: "seg14", align: "center" });
     }
