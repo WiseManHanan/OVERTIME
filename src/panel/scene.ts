@@ -31,34 +31,35 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const p = state.pip;
   // GAME OVER is a results screen — the scaffold clears to just the readout.
   const live = state.phase !== "over";
+  // Mediation is text-only, top to bottom (doc §7.2): every art asset on
+  // either screen — Pip, Bruno, the platform, hazards, the console, the
+  // Steward — steps aside, and only the card copy remains.
+  const showArt = live && state.phase !== "mediation";
 
-  if (live && floorScreen(p.floor) === screen) {
+  if (showArt && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
       lit.add(`pip.f${p.floor}.s${p.slot}.${p.pose}.${p.facing === 1 ? "r" : "l"}`);
     }
   }
   // ...and a phantom pose stuck lit where nobody is (doc §7.3).
-  if (live && state.stuckLit && floorScreen(state.stuckLit.f) === screen) {
+  if (showArt && state.stuckLit && floorScreen(state.stuckLit.f) === screen) {
     const g = state.stuckLit;
     lit.add(`pip.f${g.f}.s${g.s}.${g.pose}.r`);
   }
 
-  if (live) {
+  if (showArt) {
     for (const h of state.hazards) {
       if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
     }
   }
 
-  if (screen === "upper" && live) {
+  if (screen === "upper" && showArt) {
     if (state.phase === "cleared") {
       // Last holder pulled: the platform pivots off its anchor and takes Bruno
       // with it, across the ROUND CLEARED window (doc §5.5).
       const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
       lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 5)))}`);
-    } else if (state.phase === "mediation") {
-      // Bruno and the platform step out of the way entirely — his grievance
-      // reads clean, with nothing behind it (doc §7.2).
     } else {
       const face = state.brunoDir === 1 ? "r" : "l";
       const pose = state.swipe > 0 ? "swipe" : "pace";
@@ -78,7 +79,9 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
 
     for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
+  }
 
+  if (screen === "upper" && live) {
     if (state.phase !== "title") {
       // One line across the very top-left: above Pip's tallest reach on floor 4
       // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).

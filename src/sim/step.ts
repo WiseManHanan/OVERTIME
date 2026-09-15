@@ -457,30 +457,16 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   misses = Math.min(misses, missesAllowed); // two hits in one tick still ends it
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
-  let mediationCards = state.mediationCards;
-  let mediationSelected = state.mediationSelected;
   if (misses >= missesAllowed) {
     phase = "over";
   } else if (bolts.every((b) => b)) {
+    // The platform still falls the ordinary way (doc §5.5) — a grievance
+    // interlude, if this round earns one, waits for that to finish (stepCleared).
+    phase = "cleared";
+    clearedCountdown = ROUND_CLEARED_TICKS;
     // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
     const clearMult = state.clock === "night" && nightWoken ? 1 : cp.clearMult;
     rawPoints += POINTS_PER_ROUND_CLEAR * clearMult;
-
-    // Every third round clear opens a grievance interlude — unless the pool
-    // of concessions is already spent, in which case the round clears the
-    // ordinary way (doc §7.2).
-    const [cards, rngAfterDraw] = isGrievanceRound(state.round)
-      ? drawConcessionCards(state.concessions, rng)
-      : ([[], rng] as const);
-    if (cards.length > 0) {
-      rng = rngAfterDraw;
-      phase = "mediation";
-      mediationCards = cards.map((c) => c.id);
-      mediationSelected = 0;
-    } else {
-      phase = "cleared";
-      clearedCountdown = ROUND_CLEARED_TICKS;
-    }
   }
 
   const score =
@@ -503,8 +489,6 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     swipeCountdown,
     swipe,
     clearedCountdown,
-    mediationCards,
-    mediationSelected,
     moveStreak,
     nightNoise,
     nightWoken,
@@ -526,6 +510,24 @@ function stepCleared(state: GameState): GameState {
       clearedCountdown: n,
       swipe: Math.max(0, state.swipe - 1),
     };
+  }
+
+  // The platform has finished falling. Every third clear opens a grievance
+  // interlude here, once that's fully played out — not before (doc §7.2) —
+  // unless the pool of concessions is already spent, in which case the round
+  // just begins the ordinary way.
+  if (isGrievanceRound(state.round)) {
+    const [cards, rng] = drawConcessionCards(state.concessions, state.rng);
+    if (cards.length > 0) {
+      return {
+        ...state,
+        tick: state.tick + 1,
+        phase: "mediation",
+        rng,
+        mediationCards: cards.map((c) => c.id),
+        mediationSelected: 0,
+      };
+    }
   }
   return beginNextRound(state);
 }

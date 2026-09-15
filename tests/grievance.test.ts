@@ -123,9 +123,24 @@ const almostCleared = (round: number, seed = 1): GameState => ({
   pip: { ...initialState(seed).pip, floor: 4, slot: CONSOLE_SLOT, releasing: 1, releasingBolt: 3 },
 });
 
+/** Steps a just-cleared state through the whole ROUND CLEARED countdown —
+ *  the platform falls the ordinary way (doc §5.5) before a grievance
+ *  interlude, if this round earns one, ever appears (doc §7.2). */
+const throughRoundClear = (s: GameState): GameState => {
+  let cur = s;
+  while (cur.phase === "cleared") cur = step(cur, null);
+  return cur;
+};
+
 describe("the mediation phase (doc §7.2)", () => {
-  it("clearing round 2 opens mediation with up to three cards, paused", () => {
-    let s = step(almostCleared(2), null);
+  it("clearing the round always falls the ordinary way first", () => {
+    const s = step(almostCleared(2), null);
+    expect(s.phase).toBe("cleared"); // not mediation yet — the fall plays first
+    expect(s.mediationCards).toEqual([]);
+  });
+
+  it("mediation opens with up to three cards, paused, once the fall finishes", () => {
+    const s = throughRoundClear(step(almostCleared(2), null));
     expect(s.phase).toBe("mediation");
     expect(s.mediationCards.length).toBeGreaterThan(0);
     expect(s.mediationCards.length).toBeLessThanOrEqual(3);
@@ -134,13 +149,13 @@ describe("the mediation phase (doc §7.2)", () => {
   });
 
   it("clearing a non-grievance round skips it entirely", () => {
-    const s = step(almostCleared(1), null);
-    expect(s.phase).toBe("cleared");
+    const s = throughRoundClear(step(almostCleared(1), null));
+    expect(s.phase).toBe("playing"); // straight into round 2, no interlude
     expect(s.mediationCards).toEqual([]);
   });
 
   it("LEFT/RIGHT cycles the selection, wrapping at the ends", () => {
-    let s = step(almostCleared(2), null);
+    let s = throughRoundClear(step(almostCleared(2), null));
     const n = s.mediationCards.length;
     s = step(s, "left"); // wraps back from 0
     expect(s.mediationSelected).toBe(n - 1);
@@ -150,7 +165,7 @@ describe("the mediation phase (doc §7.2)", () => {
   });
 
   it("A picks the highlighted card and hands off into the next round", () => {
-    let s = step(almostCleared(2), null);
+    let s = throughRoundClear(step(almostCleared(2), null));
     const chosen = s.mediationCards[s.mediationSelected]!;
     s = step(s, "a");
     expect(s.phase).toBe("playing");
@@ -162,7 +177,7 @@ describe("the mediation phase (doc §7.2)", () => {
   });
 
   it("nothing advances while paused — only LEFT/RIGHT/A do anything", () => {
-    let s = step(almostCleared(2), null);
+    let s = throughRoundClear(step(almostCleared(2), null));
     const before = s;
     s = step(s, "up"); // not a picker input
     expect(s.mediationSelected).toBe(before.mediationSelected);
@@ -171,9 +186,9 @@ describe("the mediation phase (doc §7.2)", () => {
   });
 
   it("the pool empties after all six are taken — later interludes are skipped", () => {
-    let s: GameState = { ...almostCleared(9, 1), concessions: CONCESSION_CARDS.map((c) => c.id) };
-    s = step(s, null);
-    expect(s.phase).toBe("cleared"); // nothing left to offer
+    const s: GameState = { ...almostCleared(9, 1), concessions: CONCESSION_CARDS.map((c) => c.id) };
+    const cleared = throughRoundClear(step(s, null));
+    expect(cleared.phase).toBe("playing"); // nothing left to offer
   });
 });
 

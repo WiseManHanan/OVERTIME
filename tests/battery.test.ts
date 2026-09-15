@@ -15,6 +15,7 @@ import { seedRng } from "../src/sim/rng";
 import { isStandable } from "../src/sim/world";
 import { initialState, type GameState } from "../src/sim/state";
 import { step } from "../src/sim/step";
+import { CONCESSION_CARDS } from "../src/sim/grievance";
 
 describe("battery drain (doc §7.3)", () => {
   it("holds full until the failing round — 6 standard, 4 in OVERTIME", () => {
@@ -83,7 +84,17 @@ describe("battery through the round machine (doc §7.3)", () => {
   });
 
   it("clearing round 6+ drains the battery and, once low, sticks a segment", () => {
-    const s = step(cleared({ round: 6, battery: 0.5, roundClean: true }), null);
+    // Round 6 also earns a grievance interlude (doc §7.2) — spend the whole
+    // card pool first so this test can isolate the battery mechanic alone.
+    const s = step(
+      cleared({
+        round: 6,
+        battery: 0.5,
+        roundClean: true,
+        concessions: CONCESSION_CARDS.map((c) => c.id),
+      }),
+      null,
+    );
     expect(s.round).toBe(7);
     expect(s.battery).toBeCloseTo(0.41, 5);
     expect(s.stuckDark).not.toBeNull();
