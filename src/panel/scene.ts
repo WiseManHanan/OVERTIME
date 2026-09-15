@@ -102,6 +102,21 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     // Mara, at the top — on the phone, off-grid past the west edge (doc
     // §5.1). Always there, regardless of what Bruno's doing.
     lit.add("mara");
+
+    // The east lift (doc §7.4): appears from round 5, a call button lit and
+    // pending; round 10, the car finally arrives, then goes straight back
+    // down, and it's done for the rest of the run — button dark, car gone.
+    if (state.round >= 5) {
+      lit.add("lift.shaft");
+      if (state.round === 10) {
+        const roundTick = state.tick - state.playingSince;
+        if (roundTick < 40) lit.add("lift.car.f0");
+        else if (roundTick < 60) lit.add("lift.car.f1");
+        else if (roundTick < 80) lit.add("lift.car.f2");
+      } else if (state.round < 10) {
+        lit.add("lift.button");
+      }
+    }
   }
 
   if (screen === "upper" && live) {
