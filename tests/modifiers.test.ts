@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { seedRng } from "../src/sim/rng";
+import { nextFloat, seedRng } from "../src/sim/rng";
 import { MAX_SLOT, MIN_SLOT } from "../src/sim/world";
-import { rollModifier } from "../src/sim/modifiers";
+import { rollGreaseSpill, rollModifier } from "../src/sim/modifiers";
 import { CONSOLE_SLOT, initialState, type GameState } from "../src/sim/state";
 import { POINTS_PER_BOLT, POINTS_PER_ROUND_CLEAR } from "../src/sim/state";
 import { step } from "../src/sim/step";
@@ -156,6 +156,41 @@ describe("GREASED (doc §6.3)", () => {
     });
     const next = step(s, "right");
     expect(next.pip.slot).toBe(6);
+  });
+
+  it("relocates to a fresh spot the tick Pip takes a hit", () => {
+    const rngBeforeHit = seedRng(99);
+    // The segment-awareness roll (doc §7.4) draws first, every ordinary tick
+    // (glitchTicks/glitchCooldown both start at 0) — the grease reroll comes
+    // after it in step order, so the expected draw has to follow the same one.
+    const [, rngAfterGlitchRoll] = nextFloat(rngBeforeHit);
+    const [expectFloor, expectSlot] = rollGreaseSpill(rngAfterGlitchRoll);
+    const s = playing({
+      modifier: "greased",
+      greaseFloor: 3,
+      greaseSlot: 0,
+      rng: rngBeforeHit,
+      pip: { ...initialState(1).pip, floor: 2, slot: 3 },
+      // A barrel one slot upstream lands square on Pip this tick — a hit.
+      hazards: [{ kind: "barrel", floor: 2, slot: 2, dir: 1 }],
+    });
+    const next = step(s, null);
+    expect(next.hitFlash).toBeGreaterThan(0); // confirms the hit actually landed
+    expect(next.greaseFloor).toBe(expectFloor);
+    expect(next.greaseSlot).toBe(expectSlot);
+  });
+
+  it("doesn't move on an ordinary tick with no hit", () => {
+    const s = playing({
+      modifier: "greased",
+      greaseFloor: 3,
+      greaseSlot: 0,
+      pip: { ...initialState(1).pip, floor: 2, slot: 3 },
+    });
+    const next = step(s, null);
+    expect(next.hitFlash).toBe(0);
+    expect(next.greaseFloor).toBe(3);
+    expect(next.greaseSlot).toBe(0);
   });
 });
 

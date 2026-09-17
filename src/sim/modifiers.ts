@@ -72,7 +72,9 @@ function standableSlots(floor: Floor): number[] {
   return out;
 }
 
-function rollGreaseSpill(rng: RngState): [Floor, number, RngState] {
+/** GREASED's spill relocates after every hit (doc §6.3) — step.ts calls this
+ *  directly, same draw the initial roll above uses. */
+export function rollGreaseSpill(rng: RngState): [Floor, number, RngState] {
   const [fi, r1] = nextInt(rng, GREASE_FLOORS.length);
   const floor = GREASE_FLOORS[fi]!;
   const slots = standableSlots(floor);

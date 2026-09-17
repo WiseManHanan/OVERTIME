@@ -66,7 +66,7 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-import { MODIFIER_ANNOUNCE_TICKS, rollModifier } from "./modifiers";
+import { MODIFIER_ANNOUNCE_TICKS, rollGreaseSpill, rollModifier } from "./modifiers";
 
 /** Air-ticks a jump lasts in total (doc §5.2: "airborne for 2 ticks"). */
 const JUMP_AIR_TICKS = 2;
@@ -573,6 +573,16 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
   let hitFlash = 0;
+  // GREASED's spill relocates after every hit (doc §6.3) — same draw the
+  // initial roll uses, so it stays clear of floor 1/4 and off-grid slots.
+  let greaseFloor = state.greaseFloor;
+  let greaseSlot = state.greaseSlot;
+  if (tookMiss && state.modifier === "greased") {
+    const [newFloor, newSlot, r2] = rollGreaseSpill(rng);
+    rng = r2;
+    greaseFloor = newFloor;
+    greaseSlot = newSlot;
+  }
   if (tookMiss) {
     // Pause and blink first (doc-independent tuning, see HIT_FLASH_TICKS) —
     // phase stays "playing" even if this was the hit that ends the run; the
@@ -621,6 +631,8 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     glitchCooldown,
     glitchPose,
     modifierAnnounceTicks,
+    greaseFloor,
+    greaseSlot,
     queuedInput,
     moveStreak,
     nightNoise,

@@ -184,11 +184,13 @@ export const SWIPE_REACH = 1;
 export const POINTS_PER_BOLT = 100;
 /** Dropping Bruno is the point of the round — pays well (doc §5.5). */
 export const POINTS_PER_ROUND_CLEAR = 750;
-/** Ticks the post-hit freeze holds for — three blinks at a 2-tick half-period
- *  (hidden, visible, hidden, visible, hidden, visible), ending visible. */
-export const HIT_FLASH_TICKS = 12;
+/** Ticks the post-hit freeze holds for — three blinks at a 1-tick half-period
+ *  (hidden, visible, hidden, visible, hidden, visible), ending visible. Was
+ *  12 ticks at a 2-tick half-period; halved both to double the blink's speed
+ *  while keeping the same three-blink shape. */
+export const HIT_FLASH_TICKS = 6;
 /** Ticks per on/off half-cycle of the post-hit blink (scene.ts reads this). */
-export const HIT_BLINK_HALF_PERIOD = 2;
+export const HIT_BLINK_HALF_PERIOD = 1;
 /** Segment awareness (doc §7.4): roughly this often, in expectation. */
 export const GLITCH_CHANCE = 1 / 400;
 /** "Never twice within 200 ticks." */
