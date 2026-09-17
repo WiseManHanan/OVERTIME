@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { nextFloat, seedRng } from "../src/sim/rng";
-import { MAX_SLOT, MIN_SLOT } from "../src/sim/world";
+import { MAX_SLOT, MIN_SLOT, climbSlots, type Floor } from "../src/sim/world";
 import { rollGreaseSpill, rollModifier } from "../src/sim/modifiers";
 import { CONSOLE_SLOT, initialState, type GameState } from "../src/sim/state";
 import { POINTS_PER_BOLT, POINTS_PER_ROUND_CLEAR } from "../src/sim/state";
@@ -47,6 +47,9 @@ describe("rollModifier (doc §6.3)", () => {
           expect(roll.greaseSlot).not.toBe(3);
           expect(roll.greaseSlot).not.toBe(6);
         }
+        // Never a ladder slot either — landing the queued slide there would
+        // hijack the next UP/DOWN press into a sideways shove instead.
+        expect(climbSlots(roll.greaseFloor as Floor)).not.toContain(roll.greaseSlot);
       } else {
         expect(roll.deadColumn).toBeNull();
         expect(roll.greaseFloor).toBeNull();

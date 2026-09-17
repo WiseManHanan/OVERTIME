@@ -6,7 +6,7 @@
  * spawn.
  */
 import { nextInt, type RngState } from "./rng";
-import { FLOORS, MAX_SLOT, MIN_SLOT, isGap, isStandable, type Floor } from "./world";
+import { FLOORS, MAX_SLOT, MIN_SLOT, climbSlots, isGap, isStandable, type Floor } from "./world";
 
 export type Modifier =
   | "deadColumn"
@@ -64,16 +64,22 @@ export interface ModifierRoll {
   rng: RngState;
 }
 
-/** Slots GREASED may spill on, on `floor` — standable, and not bordering a
- *  gap (doc §5.1). A slot right at a gap's lip is only ever walked onto from
- *  its one open side, and the slide always continues that same direction —
- *  straight into the gap, where it can't land. Crossing a gap takes a jump
- *  regardless, so a spill there would never do anything: nothing to slide
- *  onto, nothing to show for itself. */
+/** Slots GREASED may spill on, on `floor` — standable, not bordering a gap
+ *  (doc §5.1), and not a ladder connection either:
+ *  - a gap's lip is only ever walked onto from its one open side, and the
+ *    slide always continues that same direction — straight into the gap,
+ *    where it can't land. Crossing a gap takes a jump regardless, so a spill
+ *    there would never do anything.
+ *  - a ladder slot is how Pip changes floors — landing the queued slide
+ *    there would hijack the very next input (UP or DOWN to climb) into a
+ *    forced sideways shove instead, for no reason a player could read. */
 function greaseSlots(floor: Floor): number[] {
+  const ladders = new Set(climbSlots(floor));
   const out: number[] = [];
   for (let s = MIN_SLOT; s <= MAX_SLOT; s++) {
-    if (isStandable(floor, s) && !isGap(floor, s - 1) && !isGap(floor, s + 1)) out.push(s);
+    if (isStandable(floor, s) && !isGap(floor, s - 1) && !isGap(floor, s + 1) && !ladders.has(s)) {
+      out.push(s);
+    }
   }
   return out;
 }
