@@ -601,10 +601,24 @@ function consoleSeg(pulled: number): Seg {
   return { id: `console.p${pulled}`, screen: "upper", shapes };
 }
 
-/** The three miss pips across the top of the upper panel. */
+/** A tiny standing figure for each strike — Pip's own silhouette in
+ *  miniature (head, torso, a hint of legs), not a bare block. */
+function missFigureShapes(cx: number, topY: number): Shape[] {
+  return [
+    { k: "circle", cx, cy: topY + 1, r: 1 }, // head
+    rect(cx - 1.1, topY + 2, 2.2, 2.6), // torso
+    rect(cx - 1.3, topY + 4.4, 1, 1.7), // near leg
+    rect(cx + 0.3, topY + 4.4, 1, 1.7), // far leg
+  ];
+}
+
+/** The three strike figures — top-centre of the *lower* panel (doc §4.3):
+ *  Bruno paces top-centre of the upper panel too, and his hat crown reaches
+ *  almost to the very top edge across his whole beat, so anywhere up there
+ *  eventually walks under him. Nothing on the lower panel ever does. */
 function missPipSeg(i: number): Seg {
-  const x = PANEL_W / 2 - 8 + i * 6;
-  return { id: `miss.p${i}`, screen: "upper", shapes: [{ k: "rect", x, y: 2, w: 4, h: 4 }] };
+  const cx = PANEL_W / 2 - 9 + i * 9;
+  return { id: `miss.p${i}`, screen: "lower", shapes: missFigureShapes(cx, 1) };
 }
 
 /** The boredom meter (doc §6.2): ten pips along the top-left of the lower panel,
