@@ -66,10 +66,18 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-import { MODIFIER_ANNOUNCE_TICKS, rollGreaseSpill, rollModifier } from "./modifiers";
+import { MODIFIER_ANNOUNCE_TICKS, rollGreaseSpill, rollModifier, type Modifier } from "./modifiers";
 
 /** Air-ticks a jump lasts in total (doc §5.2: "airborne for 2 ticks"). */
 const JUMP_AIR_TICKS = 2;
+
+/** CAFFEINATED (doc §6.3): Bruno's swipe cadence halves; hazard cadence is
+ *  untouched (callers read params.hazardCadence directly, unmodified). One
+ *  place for the halving so a round's very first cadence — set before any
+ *  swipe has ever counted down — matches every cadence rolled after it. */
+function swipeCadenceFor(modifier: Modifier | null, base: number): number {
+  return modifier === "caffeinated" ? Math.max(1, Math.round(base / 2)) : base;
+}
 
 export function step(state: GameState, input: InputAction | null): GameState {
   switch (state.phase) {
@@ -169,6 +177,14 @@ function movePip(
     }
     // landed this tick: `airborne` is 0 and matches "grounded", and this tick's
     // input applies immediately — fall through to the movement switch.
+    // GREASED (doc §6.3): a jump can land square on the spill too, same as a
+    // walk — `slot` was already set to the landing slot back when "a" was
+    // pressed, so the check happens here, at the moment the lock actually
+    // releases, not there. Queued the same way either way: this tick, next
+    // tick resolves it.
+    if (grease !== null && floor === grease.floor && slot === grease.slot) {
+      slideQueued = facing;
+    }
   }
 
   switch (input) {
@@ -184,10 +200,14 @@ function movePip(
         // spill — stepping onto it lands Pip there, visible, same as any
         // step; the extra slot the same direction resolves next tick (the
         // slideQueued check above), not this one, so he's actually seen
-        // standing on the spill instead of skipping straight over it.
-        if (grease !== null && floor === grease.floor && target === grease.slot) {
-          slideQueued = dir;
-        }
+        // standing on the spill instead of skipping straight over it. An
+        // explicit `null` otherwise, not just "leave it" — the tick a jump
+        // lands square on the spill can also carry a fresh walk input (the
+        // lock releases and this tick's own input applies immediately, same
+        // tick), and that walk moving him elsewhere must cancel the slide
+        // the landing just queued, not leave it to fire from a slot he's no
+        // longer standing on.
+        slideQueued = grease !== null && floor === grease.floor && target === grease.slot ? dir : null;
       }
       break;
     }
@@ -238,6 +258,10 @@ function movePip(
       airborne = JUMP_AIR_TICKS; // > 0 for both airborne ticks; hits 0 on landing
       pose = "jump";
       if (land !== null) slot = land;
+      // A fresh jump this tick supersedes any GREASED slide the landing just
+      // above queued (the same rare double-action tick as the walk case) —
+      // he's leaving the spill under his own power, not sliding off it.
+      slideQueued = null;
       break;
     }
     case null:
@@ -269,7 +293,7 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     greaseFloor: roll.greaseFloor,
     greaseSlot: roll.greaseSlot,
     spawnCountdown: params.hazardCadence,
-    swipeCountdown: params.swipeCadence,
+    swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     playingSince: state.tick + 1, // round 1 clock windows start now
     roundClean: true,
   };
@@ -324,8 +348,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const params = roundParams(effRound);
   // CAFFEINATED (doc §6.3): Bruno swipes twice as often; hazard cadence is
   // untouched (params.hazardCadence is read directly, unmodified, below).
-  const swipeCadence =
-    state.modifier === "caffeinated" ? Math.max(1, Math.round(params.swipeCadence / 2)) : params.swipeCadence;
+  const swipeCadence = swipeCadenceFor(state.modifier, params.swipeCadence);
   // STICKY PAD (doc §6.3): the buffer's usual one-tick delay doubles to two —
   // this tick acts on last tick's input, and this tick's own input waits one
   // more tick behind it.
@@ -754,7 +777,7 @@ function beginNextRound(state: GameState): GameState {
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
     spawnCountdown: params.hazardCadence,
-    swipeCountdown: params.swipeCadence,
+    swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     swipe: 0,
     clearedCountdown: 0,
     hitFlash: 0,

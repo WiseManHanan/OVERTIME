@@ -167,6 +167,43 @@ describe("GREASED (doc §6.3)", () => {
     expect(next.pip.slot).toBe(6);
   });
 
+  // A jump can land square on the spill exactly like a walk can — it should
+  // queue the same slide, not just walking onto it (floor 3 here, not 2:
+  // no gap to complicate which slots are open on either side).
+  const jumpLandedOnSpill = (): GameState =>
+    playing({
+      modifier: "greased",
+      greaseFloor: 3,
+      greaseSlot: 5,
+      pip: { ...initialState(1).pip, floor: 3, slot: 5, facing: 1, pose: "jump", airborne: 1 },
+    });
+
+  it("a jump landing on the spill also queues the slide", () => {
+    let s = jumpLandedOnSpill();
+    s = step(s, null); // airborne 1 -> 0: the lock releases, landing on the spill
+    expect(s.pip.airborne).toBe(0);
+    expect(s.pip.slot).toBe(5); // still visibly on the spill
+    expect(s.pip.slideQueued).toBe(1);
+    s = step(s, null);
+    expect(s.pip.slot).toBe(6); // slides forward next tick, same as a walked landing
+  });
+
+  it("walking away the same tick a jump lands on the spill cancels the queued slide", () => {
+    let s = jumpLandedOnSpill();
+    s = step(s, "left"); // the landing tick, but a fresh "left" is already buffered
+    expect(s.pip.slot).toBe(4); // walked off the spill this same tick
+    expect(s.pip.slideQueued).toBeNull(); // not left pointing at slot 5
+    s = step(s, null);
+    expect(s.pip.slot).toBe(4); // nothing more happens
+  });
+
+  it("a fresh jump the same tick supersedes a queued slide from the landing", () => {
+    let s = jumpLandedOnSpill();
+    s = step(s, "a"); // lands on the spill and immediately jumps again, same tick
+    expect(s.pip.airborne).toBe(2); // a brand-new jump arc
+    expect(s.pip.slideQueued).toBeNull(); // not left pointing at the old spot
+  });
+
   it("relocates to a fresh spot the tick Pip takes a hit", () => {
     const rngBeforeHit = seedRng(99);
     // The segment-awareness roll (doc §7.4) draws first, every ordinary tick
@@ -278,6 +315,29 @@ describe("CAFFEINATED (doc §6.3)", () => {
     const s = playing({ modifier: "caffeinated", spawnCountdown: 1 });
     const next = step(s, null);
     expect(next.spawnCountdown).toBe(14); // round 1's hazardCadence, untouched
+  });
+
+  it("the round's very first swipe cadence is already halved, not just re-arms", () => {
+    // Forced onto round 1 title -> playing: the modifier and the initial
+    // swipeCountdown are set in the same return, and must agree from tick one.
+    let s = initialState(7, "standard", 1, "caffeinated");
+    s = step(s, "right"); // title -> playing
+    expect(s.modifier).toBe("caffeinated");
+    expect(s.swipeCountdown).toBe(5); // round 1's 9, halved — not the base 9
+  });
+
+  it("a fresh round's first swipe cadence is halved too", () => {
+    let s: GameState = {
+      ...initialState(7, "standard", 1, "caffeinated"),
+      phase: "cleared",
+      clearedCountdown: 1,
+      bolts: [true, true, true, true],
+      modifier: "caffeinated",
+    };
+    s = step(s, null); // clearedCountdown -> 0, hands off to round 2
+    expect(s.round).toBe(2);
+    expect(s.modifier).toBe("caffeinated");
+    expect(s.swipeCountdown).toBe(5); // round 2's base is still 9 (rounds.ts)
   });
 });
 

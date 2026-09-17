@@ -51,13 +51,14 @@ const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
  *  instead, so the spotlighted floor actually pops against the rest. */
 const NIGHT_SHIFT_DIM = 0.3;
 
-// pip/barrel/chair ids carry their floor directly. Bruno's whole rig — his
-// pacing and swipe frames, the fall animation, the platform, gantry and
-// holders — plus the one console all live fixed on floor 4 and should read
-// as floor 4's fixtures, not a permanent dim regardless of where Pip stands.
-// The Steward and the miss/boredom readouts are HUD, not the scaffold — no
-// floor applies, so they're excluded here and always render at full contrast.
-const FLOOR_ID = /^(?:pip|barrel|chair)\.f(\d+)\./;
+// pip/barrel/chair/grease ids carry their floor directly (grease.f{n}.s{n} —
+// GREASED's spill, doc §6.3). Bruno's whole rig — his pacing and swipe
+// frames, the fall animation, the platform, gantry and holders — plus the
+// one console all live fixed on floor 4 and should read as floor 4's
+// fixtures, not a permanent dim regardless of where Pip stands. The Steward
+// and the miss/boredom readouts are HUD, not the scaffold — no floor
+// applies, so they're excluded here and always render at full contrast.
+const FLOOR_ID = /^(?:pip|barrel|chair|grease)\.f(\d+)\./;
 const FLOOR_4_FIXTURE = /^(?:bruno\.|gantry|holder\.|console\.)/;
 const FLOOR_4 = 4;
 
