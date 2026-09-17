@@ -20,7 +20,7 @@ function playing(overrides: Partial<GameState> = {}): GameState {
 }
 
 describe("rollModifier (doc §6.3)", () => {
-  it("draws one of the 7 modifiers, and only deadColumn carries a slot", () => {
+  it("draws one of the 7 modifiers; only deadColumn/greased carry a slot", () => {
     const seen = new Set<string>();
     let rng = seedRng(1);
     for (let i = 0; i < 500; i++) {
@@ -31,21 +31,33 @@ describe("rollModifier (doc §6.3)", () => {
         expect(roll.deadColumn).not.toBeNull();
         expect(roll.deadColumn!).toBeGreaterThanOrEqual(MIN_SLOT);
         expect(roll.deadColumn!).toBeLessThanOrEqual(MAX_SLOT);
+        expect(roll.greaseFloor).toBeNull();
+        expect(roll.greaseSlot).toBeNull();
+      } else if (roll.modifier === "greased") {
+        expect(roll.deadColumn).toBeNull();
+        expect(roll.greaseFloor).not.toBeNull();
+        expect(roll.greaseFloor).not.toBe(4); // never Bruno's deck
+        expect(roll.greaseSlot).not.toBeNull();
+        expect(roll.greaseSlot!).toBeGreaterThanOrEqual(MIN_SLOT);
+        expect(roll.greaseSlot!).toBeLessThanOrEqual(MAX_SLOT);
       } else {
         expect(roll.deadColumn).toBeNull();
+        expect(roll.greaseFloor).toBeNull();
+        expect(roll.greaseSlot).toBeNull();
       }
     }
     // 500 draws across 7 uniform options — every option should show up.
     expect(seen.size).toBe(7);
   });
 
-  it("a forced modifier always wins, but deadColumn still rolls its slot", () => {
+  it("a forced modifier always wins, but deadColumn/greased still roll their slot", () => {
     let rng = seedRng(1);
     for (let i = 0; i < 20; i++) {
       const roll = rollModifier(rng, "nightShift");
       rng = roll.rng;
       expect(roll.modifier).toBe("nightShift");
       expect(roll.deadColumn).toBeNull();
+      expect(roll.greaseFloor).toBeNull();
     }
     const slots = new Set<number>();
     for (let i = 0; i < 50; i++) {
@@ -56,31 +68,68 @@ describe("rollModifier (doc §6.3)", () => {
       slots.add(roll.deadColumn!);
     }
     expect(slots.size).toBeGreaterThan(1); // still varies, not pinned to one column
+
+    const floors = new Set<number>();
+    for (let i = 0; i < 50; i++) {
+      const roll = rollModifier(rng, "greased");
+      rng = roll.rng;
+      expect(roll.modifier).toBe("greased");
+      expect(roll.greaseFloor).not.toBeNull();
+      expect(roll.greaseFloor).not.toBe(4);
+      floors.add(roll.greaseFloor!);
+    }
+    expect(floors.size).toBeGreaterThan(1); // still varies, not pinned to one floor
   });
 });
 
 describe("GREASED (doc §6.3)", () => {
-  it("carries Pip one extra slot the same direction", () => {
+  it("stepping onto the spill carries Pip one extra slot the same direction", () => {
     const s = playing({
       modifier: "greased",
+      greaseFloor: 1,
+      greaseSlot: 6,
+      pip: { ...initialState(1).pip, floor: 1, slot: 5 },
+    });
+    const next = step(s, "right"); // steps onto slot 6 — the spill
+    expect(next.pip.slot).toBe(7); // one ordinary step, plus the slick's extra
+  });
+
+  it("an ordinary step elsewhere on the same floor is unaffected", () => {
+    const s = playing({
+      modifier: "greased",
+      greaseFloor: 1,
+      greaseSlot: 6,
+      pip: { ...initialState(1).pip, floor: 1, slot: 1 },
+    });
+    const next = step(s, "right"); // nowhere near slot 6
+    expect(next.pip.slot).toBe(2);
+  });
+
+  it("the spill doesn't reach across floors, even at the same slot number", () => {
+    const s = playing({
+      modifier: "greased",
+      greaseFloor: 3, // not floor 1
+      greaseSlot: 6,
       pip: { ...initialState(1).pip, floor: 1, slot: 5 },
     });
     const next = step(s, "right");
-    expect(next.pip.slot).toBe(7); // one ordinary step, plus the slick's extra
+    expect(next.pip.slot).toBe(6); // an ordinary step, no slide
   });
 
   it("falls back to a single step when the extra slot isn't standable", () => {
     const s = playing({
       modifier: "greased",
+      greaseFloor: 1,
+      greaseSlot: MAX_SLOT,
       pip: { ...initialState(1).pip, floor: 1, slot: MAX_SLOT - 1 },
     });
-    const next = step(s, "right");
+    const next = step(s, "right"); // steps onto the spill, right at the edge
     expect(next.pip.slot).toBe(MAX_SLOT); // slid to the edge, no further
   });
 
-  it("an ordinary round takes just the one step", () => {
+  it("an ordinary round (no spill this round) takes just the one step", () => {
     const s = playing({
-      modifier: "caffeinated", // anything but greased
+      modifier: "caffeinated", // anything but greased; greaseFloor/Slot stay null
       pip: { ...initialState(1).pip, floor: 1, slot: 5 },
     });
     const next = step(s, "right");
@@ -216,5 +265,14 @@ describe("forcedModifier (?modifier=, doc §6.3 playtest hook)", () => {
     s = step(s, null); // clearedCountdown -> 0, hands off to round 2
     expect(s.round).toBe(2);
     expect(s.modifier).toBe("silentRunning");
+  });
+
+  it("?modifier=greased reaches an actual spill location, not just the label", () => {
+    let s = initialState(7, "standard", 1, "greased");
+    s = step(s, "right"); // title -> playing
+    expect(s.modifier).toBe("greased");
+    expect(s.greaseFloor).not.toBeNull();
+    expect(s.greaseFloor).not.toBe(4);
+    expect(s.greaseSlot).not.toBeNull();
   });
 });

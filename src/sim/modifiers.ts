@@ -2,10 +2,11 @@
  * Round modifiers (doc §6.3). One is drawn at every round's start and holds
  * for the whole round — a different twist on the same climb each time.
  * Pure and seed-driven throughout (invariant 1/2): the draw (and DEAD
- * COLUMN's extra slot roll) consumes the run's RNG like a hazard spawn.
+ * COLUMN's/GREASED's extra slot rolls) consumes the run's RNG like a hazard
+ * spawn.
  */
 import { nextInt, type RngState } from "./rng";
-import { MAX_SLOT, MIN_SLOT } from "./world";
+import { FLOORS, MAX_SLOT, MIN_SLOT, isStandable, type Floor } from "./world";
 
 export type Modifier =
   | "deadColumn"
@@ -40,6 +41,10 @@ const MODIFIERS: readonly Modifier[] = [
   "nightShift",
 ];
 
+/** GREASED never spills on floor 4 — Bruno's deck, the console and holders,
+ *  not a place Pip is meant to be sliding around unannounced. */
+const GREASE_FLOORS: readonly Floor[] = FLOORS.filter((f) => f !== 4);
+
 /** Type guard for `?modifier=` (main.ts) — any other string is ignored. */
 export function isModifier(x: string): x is Modifier {
   return (MODIFIERS as readonly string[]).includes(x);
@@ -50,25 +55,54 @@ export interface ModifierRoll {
   /** Only meaningful when `modifier` is "deadColumn" — the one slot, every
    *  floor, that never lights this round. */
   deadColumn: number | null;
+  /** GREASED's spill (doc §6.3): the one floor/slot cell — never floor 4 —
+   *  that carries Pip one extra slot when he steps onto it. Both null or
+   *  both set together; only meaningful when `modifier` is "greased". */
+  greaseFloor: Floor | null;
+  greaseSlot: number | null;
   rng: RngState;
 }
+
+function standableSlots(floor: Floor): number[] {
+  const out: number[] = [];
+  for (let s = MIN_SLOT; s <= MAX_SLOT; s++) {
+    if (isStandable(floor, s)) out.push(s);
+  }
+  return out;
+}
+
+function rollGreaseSpill(rng: RngState): [Floor, number, RngState] {
+  const [fi, r1] = nextInt(rng, GREASE_FLOORS.length);
+  const floor = GREASE_FLOORS[fi]!;
+  const slots = standableSlots(floor);
+  const [si, r2] = nextInt(r1, slots.length);
+  return [floor, slots[si]!, r2];
+}
+
+const NO_SPILL = { deadColumn: null, greaseFloor: null, greaseSlot: null } as const;
 
 /** One modifier, drawn uniformly (doc doesn't call for weighting, unlike
  *  Mara's old ratings) — repeats across rounds are allowed.
  *
  *  `force`, when given, skips the draw and always returns that modifier —
  *  `GameState.forcedModifier`, a debug/playtest override (`?modifier=` in
- *  main.ts) for playing a specific one on demand. DEAD COLUMN still rolls
- *  its slot off the RNG either way, so a forced run isn't stuck on one column. */
+ *  main.ts) for playing a specific one on demand. DEAD COLUMN and GREASED
+ *  still roll their slot off the RNG either way, so a forced run isn't
+ *  stuck on one column or one spill. */
 export function rollModifier(rng: RngState, force: Modifier | null = null): ModifierRoll {
-  if (force !== null) {
-    if (force !== "deadColumn") return { modifier: force, deadColumn: null, rng };
-    const [slot, r1] = nextInt(rng, MAX_SLOT - MIN_SLOT + 1);
-    return { modifier: force, deadColumn: MIN_SLOT + slot, rng: r1 };
+  const [modifier, r1] =
+    force !== null ? [force, rng] : (() => {
+      const [i, r] = nextInt(rng, MODIFIERS.length);
+      return [MODIFIERS[i]!, r] as const;
+    })();
+
+  if (modifier === "deadColumn") {
+    const [slot, r2] = nextInt(r1, MAX_SLOT - MIN_SLOT + 1);
+    return { modifier, ...NO_SPILL, deadColumn: MIN_SLOT + slot, rng: r2 };
   }
-  const [i, r1] = nextInt(rng, MODIFIERS.length);
-  const modifier = MODIFIERS[i]!;
-  if (modifier !== "deadColumn") return { modifier, deadColumn: null, rng: r1 };
-  const [slot, r2] = nextInt(r1, MAX_SLOT - MIN_SLOT + 1);
-  return { modifier, deadColumn: MIN_SLOT + slot, rng: r2 };
+  if (modifier === "greased") {
+    const [greaseFloor, greaseSlot, r2] = rollGreaseSpill(r1);
+    return { modifier, ...NO_SPILL, greaseFloor, greaseSlot, rng: r2 };
+  }
+  return { modifier, ...NO_SPILL, rng: r1 };
 }

@@ -66,7 +66,7 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-import { MODIFIER_ANNOUNCE_TICKS, rollModifier, type Modifier } from "./modifiers";
+import { MODIFIER_ANNOUNCE_TICKS, rollModifier } from "./modifiers";
 
 /** Air-ticks a jump lasts in total (doc §5.2: "airborne for 2 ticks"). */
 const JUMP_AIR_TICKS = 2;
@@ -109,7 +109,7 @@ function movePip(
   input: InputAction | null,
   bolts: readonly boolean[],
   effects: GrievanceEffects,
-  modifier: Modifier | null,
+  grease: { floor: Floor; slot: number } | null,
 ): PipStep {
   let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo } = p;
   let pose: PipPose = "stand";
@@ -167,10 +167,11 @@ function movePip(
       if (isStandable(floor, target, effects.gapClosed)) {
         slot = target;
         pose = "walk";
-        // GREASED (doc §6.3): every floor is a coffee-cup slick — a step
-        // carries an extra slot the same direction, falling back to just
-        // the one step if the far side isn't somewhere Pip could stand.
-        if (modifier === "greased") {
+        // GREASED (doc §6.3): one floor/slot cell this round is a coffee-cup
+        // spill — stepping onto it carries Pip one extra slot the same
+        // direction, falling back to just the one step if the far side isn't
+        // somewhere Pip could stand.
+        if (grease !== null && floor === grease.floor && target === grease.slot) {
           const slideTo = slot + dir;
           if (isStandable(floor, slideTo, effects.gapClosed)) slot = slideTo;
         }
@@ -252,6 +253,8 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     modifier: roll.modifier,
     modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
     deadColumn: roll.deadColumn,
+    greaseFloor: roll.greaseFloor,
+    greaseSlot: roll.greaseSlot,
     spawnCountdown: params.hazardCadence,
     swipeCountdown: params.swipeCadence,
     playingSince: state.tick + 1, // round 1 clock windows start now
@@ -337,7 +340,9 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   // 1 — Pip
-  const outcome = movePip(state.pip, effectiveInput, state.bolts, effects, state.modifier);
+  const grease =
+    state.greaseFloor !== null ? { floor: state.greaseFloor, slot: state.greaseSlot! } : null;
+  const outcome = movePip(state.pip, effectiveInput, state.bolts, effects, grease);
   let pip = outcome.pip;
   let bolts = state.bolts;
   let boltProgress = state.boltProgress;
@@ -740,6 +745,8 @@ function beginNextRound(state: GameState): GameState {
     modifier: roll.modifier,
     modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
     deadColumn: roll.deadColumn,
+    greaseFloor: roll.greaseFloor,
+    greaseSlot: roll.greaseSlot,
     queuedInput: null,
   };
 }

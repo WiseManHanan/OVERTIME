@@ -141,6 +141,11 @@ export interface GameState {
   modifierAnnounceTicks: number;
   /** DEAD COLUMN's slot (every floor), or `null` any other round. */
   deadColumn: number | null;
+  /** GREASED's spill (doc §6.3): the one floor/slot cell — never floor 4 —
+   *  that carries Pip one extra slot when he steps onto it. Both null, or
+   *  both set together; null any round GREASED isn't in effect. */
+  greaseFloor: Floor | null;
+  greaseSlot: number | null;
   /** STICKY PAD (doc §6.3): the input from last tick, applied this tick
    *  instead — doubling the buffer's usual one-tick delay to two. `null` and
    *  unused any round STICKY PAD isn't in effect. */
@@ -259,6 +264,8 @@ export function initialState(
     modifier: null,
     modifierAnnounceTicks: 0,
     deadColumn: null,
+    greaseFloor: null,
+    greaseSlot: null,
     queuedInput: null,
     forcedModifier: forceModifier,
   };

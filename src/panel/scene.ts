@@ -79,6 +79,13 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     }
   }
 
+  // GREASED's spill (doc §6.3): painted for the whole round at its one
+  // floor/slot cell — not tied to the hazard list, since it never moves and
+  // never expires like one does.
+  if (showArt && state.greaseFloor !== null && floorScreen(state.greaseFloor) === screen) {
+    lit.add(`grease.f${state.greaseFloor}.s${state.greaseSlot}`);
+  }
+
   if (screen === "upper" && showArt) {
     if (state.phase === "cleared") {
       // Last holder pulled: the platform pivots off its anchor and takes Bruno

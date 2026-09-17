@@ -293,7 +293,7 @@ At round start, the seeded RNG draws one modifier. It is announced on the lower 
 |---|---|
 | `DEAD COLUMN` | One slot column's Pip segments never light — he's invisible standing in it, any floor. A camouflage perk only: a hazard sharing that slot still lights normally, so it's never an invisible, untelegraphed hit. |
 | `CAFFEINATED` | Bruno's swipe cadence halves, hazard cadence unchanged. |
-| `GREASED` | All floors behave as slick (see coffee cup). |
+| `GREASED` | One random floor/slot (never floor 4) gets a coffee-cup spill for the round — visibly marked, and stepping onto it carries Pip one extra slot in his direction of travel. (A blanket "every floor is slick" first pass made it impossible to line Pip up precisely at the console; narrowed to one marked spot so the console itself stays reliable.) |
 | `DOUBLE BOLTS` | Same 4 console levers, but each takes two hauls before its holder actually releases — no new art, the console only ever shows real completions. Round-clear points double. |
 | `STICKY PAD` | Input buffer delay increases to 2 ticks. |
 | `SILENT RUNNING` | Audio muted; the Steward mimes his commentary instead. |

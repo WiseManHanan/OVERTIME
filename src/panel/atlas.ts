@@ -260,6 +260,26 @@ function barrelShapes(cx: number, b: number, roll = 0): Shape[] {
   ];
 }
 
+/** GREASED's coffee spill (doc §6.3): a dark, irregular puddle painted flat on
+ *  the floor plate, with a droplet kicked clear of it — the one slot, on one
+ *  floor (never 4), that carries Pip an extra slot when he steps into it. */
+function spillShapes(cx: number, b: number): Shape[] {
+  return [
+    poly([
+      [cx - 3.6, b - 0.6],
+      [cx - 2.6, b - 1.6],
+      [cx - 0.6, b - 1.2],
+      [cx + 1.4, b - 1.8],
+      [cx + 3.2, b - 1],
+      [cx + 3.8, b - 0.2],
+      [cx + 2, b - 0.1],
+      [cx - 1, b - 0.3],
+      [cx - 3, b - 0.1],
+    ]),
+    { k: "circle", cx: cx + 4.8, cy: b - 0.5, r: 1.1 },
+  ];
+}
+
 /** An office chair: a *high* hazard — cannot be jumped, only ducked (doc §5.4).
  *  Seat, backrest, gas post, a splayed base on casters. `roll` (0/1) leans the
  *  backrest so it reads as spinning end over end down the scaffold. */
@@ -681,6 +701,10 @@ function build(): Seg[] {
       // frame is baked from slot parity so a row of them reads as tumbling.
       segs.push({ id: `barrel.f${floor}.s${s}`, screen, shapes: barrelShapes(cx, baseY, s % 2) });
       segs.push({ id: `chair.f${floor}.s${s}`, screen, shapes: chairShapes(cx, baseY, s % 2) });
+      // GREASED never rolls floor 4 (Bruno's deck) as the spill's floor, but
+      // the atlas is static and built once — generating the segment here for
+      // every floor costs nothing, same as barrel/chair above.
+      segs.push({ id: `grease.f${floor}.s${s}`, screen, shapes: spillShapes(cx, baseY) });
     }
   }
 
