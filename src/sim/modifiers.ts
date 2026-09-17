@@ -6,7 +6,7 @@
  * spawn.
  */
 import { nextInt, type RngState } from "./rng";
-import { FLOORS, MAX_SLOT, MIN_SLOT, isStandable, type Floor } from "./world";
+import { FLOORS, MAX_SLOT, MIN_SLOT, isGap, isStandable, type Floor } from "./world";
 
 export type Modifier =
   | "deadColumn"
@@ -64,10 +64,16 @@ export interface ModifierRoll {
   rng: RngState;
 }
 
-function standableSlots(floor: Floor): number[] {
+/** Slots GREASED may spill on, on `floor` — standable, and not bordering a
+ *  gap (doc §5.1). A slot right at a gap's lip is only ever walked onto from
+ *  its one open side, and the slide always continues that same direction —
+ *  straight into the gap, where it can't land. Crossing a gap takes a jump
+ *  regardless, so a spill there would never do anything: nothing to slide
+ *  onto, nothing to show for itself. */
+function greaseSlots(floor: Floor): number[] {
   const out: number[] = [];
   for (let s = MIN_SLOT; s <= MAX_SLOT; s++) {
-    if (isStandable(floor, s)) out.push(s);
+    if (isStandable(floor, s) && !isGap(floor, s - 1) && !isGap(floor, s + 1)) out.push(s);
   }
   return out;
 }
@@ -77,7 +83,7 @@ function standableSlots(floor: Floor): number[] {
 export function rollGreaseSpill(rng: RngState): [Floor, number, RngState] {
   const [fi, r1] = nextInt(rng, GREASE_FLOORS.length);
   const floor = GREASE_FLOORS[fi]!;
-  const slots = standableSlots(floor);
+  const slots = greaseSlots(floor);
   const [si, r2] = nextInt(r1, slots.length);
   return [floor, slots[si]!, r2];
 }

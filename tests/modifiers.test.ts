@@ -41,6 +41,12 @@ describe("rollModifier (doc §6.3)", () => {
         expect(roll.greaseSlot).not.toBeNull();
         expect(roll.greaseSlot!).toBeGreaterThanOrEqual(MIN_SLOT);
         expect(roll.greaseSlot!).toBeLessThanOrEqual(MAX_SLOT);
+        // Floor 2's gap is slots 4-5 (world.ts) — its lip slots, 3 and 6,
+        // are where the slide would always whiff into the gap. Never those.
+        if (roll.greaseFloor === 2) {
+          expect(roll.greaseSlot).not.toBe(3);
+          expect(roll.greaseSlot).not.toBe(6);
+        }
       } else {
         expect(roll.deadColumn).toBeNull();
         expect(roll.greaseFloor).toBeNull();
