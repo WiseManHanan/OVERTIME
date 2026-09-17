@@ -242,7 +242,7 @@ function stepTitle(state: GameState, input: InputAction | null): GameState {
     return { ...state, tick: state.tick + 1, pip };
   }
   const params = roundParams(state.round);
-  const roll = rollModifier(state.rng); // round 1's modifier (doc §6.3)
+  const roll = rollModifier(state.rng, state.forcedModifier); // round 1's modifier (doc §6.3)
   return {
     ...state,
     tick: state.tick + 1,
@@ -694,7 +694,7 @@ function beginNextRound(state: GameState): GameState {
   }
 
   // A fresh modifier every round (doc §6.3) — repeats across rounds allowed.
-  const roll = rollModifier(rng);
+  const roll = rollModifier(rng, state.forcedModifier);
   rng = roll.rng;
 
   return {

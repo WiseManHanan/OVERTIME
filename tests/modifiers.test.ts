@@ -38,6 +38,25 @@ describe("rollModifier (doc §6.3)", () => {
     // 500 draws across 7 uniform options — every option should show up.
     expect(seen.size).toBe(7);
   });
+
+  it("a forced modifier always wins, but deadColumn still rolls its slot", () => {
+    let rng = seedRng(1);
+    for (let i = 0; i < 20; i++) {
+      const roll = rollModifier(rng, "nightShift");
+      rng = roll.rng;
+      expect(roll.modifier).toBe("nightShift");
+      expect(roll.deadColumn).toBeNull();
+    }
+    const slots = new Set<number>();
+    for (let i = 0; i < 50; i++) {
+      const roll = rollModifier(rng, "deadColumn");
+      rng = roll.rng;
+      expect(roll.modifier).toBe("deadColumn");
+      expect(roll.deadColumn).not.toBeNull();
+      slots.add(roll.deadColumn!);
+    }
+    expect(slots.size).toBeGreaterThan(1); // still varies, not pinned to one column
+  });
 });
 
 describe("GREASED (doc §6.3)", () => {
@@ -158,5 +177,28 @@ describe("STICKY PAD (doc §6.3)", () => {
     expect(s.queuedInput).toBe("right");
     s = step(s, null); // last tick's "right" lands now
     expect(s.pip.slot).toBe(6);
+  });
+});
+
+describe("forcedModifier (?modifier=, doc §6.3 playtest hook)", () => {
+  it("round 1 draws the forced modifier instead of rolling one", () => {
+    let s = initialState(7, "standard", 1, "nightShift");
+    s = step(s, "right"); // title -> playing
+    expect(s.phase).toBe("playing");
+    expect(s.modifier).toBe("nightShift");
+  });
+
+  it("every following round keeps drawing it too", () => {
+    // Round 1, cleared instantly: all four bolts already down.
+    let s: GameState = {
+      ...initialState(7, "standard", 1, "silentRunning"),
+      phase: "cleared",
+      clearedCountdown: 1,
+      bolts: [true, true, true, true],
+      modifier: "silentRunning",
+    };
+    s = step(s, null); // clearedCountdown -> 0, hands off to round 2
+    expect(s.round).toBe(2);
+    expect(s.modifier).toBe("silentRunning");
   });
 });

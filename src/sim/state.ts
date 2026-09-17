@@ -145,6 +145,12 @@ export interface GameState {
    *  instead — doubling the buffer's usual one-tick delay to two. `null` and
    *  unused any round STICKY PAD isn't in effect. */
   queuedInput: InputAction | null;
+  /** Debug/playtest override (`?modifier=` in main.ts, mirrors `?round=`):
+   *  every round draws this modifier instead of rolling one, so a specific
+   *  modifier can be played on demand rather than waited for. Resolved once
+   *  at run start, like the seed and clock (invariant 1) — `null` in an
+   *  ordinary run. */
+  forcedModifier: Modifier | null;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -202,11 +208,14 @@ export function freshPip(): Pip {
  *  playtesting a specific round's tuning without climbing there first. Play
  *  from title still goes through the normal round-speed lookup (stepTitle
  *  reads `state.round`), so a cheat start behaves exactly like reaching that
- *  round the ordinary way. */
+ *  round the ordinary way. `forceModifier` is the same idea for `?modifier=`
+ *  — a specific round modifier (doc §6.3) played on demand, any time of day,
+ *  rather than waited for. */
 export function initialState(
   seed: number,
   clock: ClockMode = "standard",
   startRound = 1,
+  forceModifier: Modifier | null = null,
 ): GameState {
   const first = roundParams(startRound);
   return {
@@ -251,6 +260,7 @@ export function initialState(
     modifierAnnounceTicks: 0,
     deadColumn: null,
     queuedInput: null,
+    forcedModifier: forceModifier,
   };
 }
 

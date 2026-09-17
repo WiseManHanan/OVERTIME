@@ -20,6 +20,7 @@ import { clockParams, effectiveRound, resolveClock } from "./sim/clock";
 import { batteryContrast, batteryDetune, isBlackoutTick } from "./sim/battery";
 import { effectsFor } from "./sim/grievance";
 import { stewardMood } from "./sim/scoring";
+import { isModifier, type Modifier } from "./sim/modifiers";
 import { createBeeper, type Cue } from "./audio/beeper";
 import { loadMute, saveMute } from "./store/persist";
 import type { Screen } from "./panel/types";
@@ -108,10 +109,24 @@ function debugStartRound(): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
+// Cheat: ?modifier=nightShift forces every round to draw that modifier (doc
+// §6.3) instead of rolling one — playtesting a specific one (NIGHT SHIFT, any
+// time of day, no waiting on the odds) without it needing to come up on its
+// own. An unrecognized or missing value is the ordinary random draw.
+function debugModifier(): Modifier | null {
+  const raw = new URLSearchParams(window.location.search).get("modifier");
+  return raw !== null && isModifier(raw) ? raw : null;
+}
+
 // A run starts with the wall clock read once (doc §7.1) — resolved here, never
 // inside step().
 function freshRun(): GameState {
-  return initialState(Date.now() >>> 0, resolveClock(new Date()), debugStartRound());
+  return initialState(
+    Date.now() >>> 0,
+    resolveClock(new Date()),
+    debugStartRound(),
+    debugModifier(),
+  );
 }
 let state = freshRun();
 
