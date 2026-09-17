@@ -5,11 +5,14 @@ import { step, type InputAction } from "../src/sim/step";
 type Act = InputAction | null;
 
 // Movement in isolation: pin the spawn/swipe countdowns so no barrel or swipe
-// ever interferes with a pure-motion assertion.
+// ever interferes with a pure-motion assertion, and null out the round
+// modifier (doc §6.3) so a random GREASED slide or STICKY PAD buffer delay
+// doesn't throw off an exact-slot assertion — those get their own tests.
 const quiet = (s: GameState): GameState => ({
   ...s,
   spawnCountdown: 1e9,
   swipeCountdown: 1e9,
+  modifier: null,
 });
 const mstep = (s: GameState, a: Act): GameState => step(quiet(s), a);
 const run = (acts: Act[], seed = 1): GameState =>

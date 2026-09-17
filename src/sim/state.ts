@@ -15,9 +15,14 @@ import type { ClockMode } from "./clock";
 import type { StuckPose } from "./battery";
 import type { Hazard } from "./hazards";
 import type { ConcessionId } from "./grievance";
+import type { Modifier } from "./modifiers";
 
 export type Facing = -1 | 1;
 export type PipPose = "stand" | "walk" | "climb" | "duck" | "jump" | "release";
+/** A single tick's action, drained from the one-slot input buffer (doc §4.4).
+ *  Lives here, not step.ts, so GameState (STICKY PAD's queued input) can
+ *  reference it without step.ts <-> state.ts becoming circular. */
+export type InputAction = "left" | "right" | "up" | "down" | "a";
 
 /** The run's overall state machine. `mediation` is the grievance interlude
  *  (doc §7.2) — play is paused while the Steward presents concession cards. */
@@ -42,6 +47,11 @@ export interface Pip {
    *  like a bolt release. `>0` means locked; `climbTo` is the floor it lands on. */
   climbing: number;
   climbTo: Floor | null;
+  /** GREASED's spill (doc §6.3): set the tick Pip steps onto the marked slot —
+   *  he stands there visible this tick, then next tick automatically slides
+   *  one more slot this direction, input or not (like a locked climb/release).
+   *  `null` once resolved, or any round GREASED isn't in effect. */
+  slideQueued: Facing | null;
 }
 
 export interface GameState {
@@ -61,6 +71,10 @@ export interface GameState {
    *  holders at the platform's free end; all four out and the platform pivots
    *  off its anchor — Bruno goes down, the round clears (doc §5.5). */
   bolts: readonly boolean[];
+  /** Hauls banked per holder so far. Normally a single haul is enough (matches
+   *  `bolts` one-for-one); DOUBLE BOLTS (doc §6.3) needs two per lever before
+   *  it flips to released — the console still shows only real completions. */
+  boltProgress: readonly number[];
   /** The slot Bruno is pacing over on his girder (doc §5.5). */
   brunoSlot: number;
   /** Which way Bruno is pacing; flips at the ends of his beat. */
@@ -125,6 +139,28 @@ export interface GameState {
   /** The mismatched pose the glitch tick lights, chosen when it fires.
    *  Meaningless while glitchTicks is 0. */
   glitchPose: PipPose | null;
+  /** This round's modifier (doc §6.3), drawn fresh every round — repeats
+   *  across rounds are allowed. `null` only before round 1 ever starts. */
+  modifier: Modifier | null;
+  /** Ticks left on the 14-segment announcement banner. */
+  modifierAnnounceTicks: number;
+  /** DEAD COLUMN's slot (every floor), or `null` any other round. */
+  deadColumn: number | null;
+  /** GREASED's spill (doc §6.3): the one floor/slot cell — never floor 4 —
+   *  that carries Pip one extra slot when he steps onto it. Both null, or
+   *  both set together; null any round GREASED isn't in effect. */
+  greaseFloor: Floor | null;
+  greaseSlot: number | null;
+  /** STICKY PAD (doc §6.3): the input from last tick, applied this tick
+   *  instead — doubling the buffer's usual one-tick delay to two. `null` and
+   *  unused any round STICKY PAD isn't in effect. */
+  queuedInput: InputAction | null;
+  /** Debug/playtest override (`?modifier=` in main.ts, mirrors `?round=`):
+   *  every round draws this modifier instead of rolling one, so a specific
+   *  modifier can be played on demand rather than waited for. Resolved once
+   *  at run start, like the seed and clock (invariant 1) — `null` in an
+   *  ordinary run. */
+  forcedModifier: Modifier | null;
 }
 
 export const START_FLOOR: Floor = 1;
@@ -148,11 +184,13 @@ export const SWIPE_REACH = 1;
 export const POINTS_PER_BOLT = 100;
 /** Dropping Bruno is the point of the round — pays well (doc §5.5). */
 export const POINTS_PER_ROUND_CLEAR = 750;
-/** Ticks the post-hit freeze holds for — three blinks at a 2-tick half-period
- *  (hidden, visible, hidden, visible, hidden, visible), ending visible. */
-export const HIT_FLASH_TICKS = 12;
+/** Ticks the post-hit freeze holds for — three blinks at a 1-tick half-period
+ *  (hidden, visible, hidden, visible, hidden, visible), ending visible. Was
+ *  12 ticks at a 2-tick half-period; halved both to double the blink's speed
+ *  while keeping the same three-blink shape. */
+export const HIT_FLASH_TICKS = 6;
 /** Ticks per on/off half-cycle of the post-hit blink (scene.ts reads this). */
-export const HIT_BLINK_HALF_PERIOD = 2;
+export const HIT_BLINK_HALF_PERIOD = 1;
 /** Segment awareness (doc §7.4): roughly this often, in expectation. */
 export const GLITCH_CHANCE = 1 / 400;
 /** "Never twice within 200 ticks." */
@@ -175,6 +213,7 @@ export function freshPip(): Pip {
     releasingBolt: -1,
     climbing: 0,
     climbTo: null,
+    slideQueued: null,
   };
 }
 
@@ -182,11 +221,14 @@ export function freshPip(): Pip {
  *  playtesting a specific round's tuning without climbing there first. Play
  *  from title still goes through the normal round-speed lookup (stepTitle
  *  reads `state.round`), so a cheat start behaves exactly like reaching that
- *  round the ordinary way. */
+ *  round the ordinary way. `forceModifier` is the same idea for `?modifier=`
+ *  — a specific round modifier (doc §6.3) played on demand, any time of day,
+ *  rather than waited for. */
 export function initialState(
   seed: number,
   clock: ClockMode = "standard",
   startRound = 1,
+  forceModifier: Modifier | null = null,
 ): GameState {
   const first = roundParams(startRound);
   return {
@@ -201,6 +243,7 @@ export function initialState(
     pip: freshPip(),
     hazards: [],
     bolts: BOLT_SLOTS.map(() => false),
+    boltProgress: BOLT_SLOTS.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
     spawnCountdown: first.hazardCadence,
@@ -226,6 +269,13 @@ export function initialState(
     glitchTicks: 0,
     glitchCooldown: 0,
     glitchPose: null,
+    modifier: null,
+    modifierAnnounceTicks: 0,
+    deadColumn: null,
+    greaseFloor: null,
+    greaseSlot: null,
+    queuedInput: null,
+    forcedModifier: forceModifier,
   };
 }
 

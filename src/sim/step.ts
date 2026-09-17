@@ -9,7 +9,7 @@
  * The run is a small state machine: title -> playing -> cleared -> playing ...
  * with `over` as a trap state (main.ts turns an A press there into a fresh run).
  */
-import type { GameState, Pip, PipPose } from "./state";
+import type { GameState, InputAction, Pip, PipPose } from "./state";
 import {
   BOLT_RELEASE_TICKS,
   BRUNO_MAX_SLOT,
@@ -30,6 +30,7 @@ import {
   freshPip,
   isAirborne,
 } from "./state";
+export type { InputAction } from "./state";
 import {
   floorAbove,
   floorBelow,
@@ -65,11 +66,18 @@ import {
   isGrievanceRound,
   type GrievanceEffects,
 } from "./grievance";
-
-export type InputAction = "left" | "right" | "up" | "down" | "a";
+import { MODIFIER_ANNOUNCE_TICKS, rollGreaseSpill, rollModifier, type Modifier } from "./modifiers";
 
 /** Air-ticks a jump lasts in total (doc §5.2: "airborne for 2 ticks"). */
 const JUMP_AIR_TICKS = 2;
+
+/** CAFFEINATED (doc §6.3): Bruno's swipe cadence halves; hazard cadence is
+ *  untouched (callers read params.hazardCadence directly, unmodified). One
+ *  place for the halving so a round's very first cadence — set before any
+ *  swipe has ever counted down — matches every cadence rolled after it. */
+function swipeCadenceFor(modifier: Modifier | null, base: number): number {
+  return modifier === "caffeinated" ? Math.max(1, Math.round(base / 2)) : base;
+}
 
 export function step(state: GameState, input: InputAction | null): GameState {
   switch (state.phase) {
@@ -109,18 +117,32 @@ function movePip(
   input: InputAction | null,
   bolts: readonly boolean[],
   effects: GrievanceEffects,
+  grease: { floor: Floor; slot: number } | null,
 ): PipStep {
-  let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo } = p;
+  let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo, slideQueued } =
+    p;
   let pose: PipPose = "stand";
   let releasedBolt = -1;
   const boltTicks = effects.boltReleaseTicks ?? BOLT_RELEASE_TICKS;
   // One place that reads the current bindings into a PipStep — every exit
-  // below calls this instead of re-listing all nine Pip fields itself, so a
+  // below calls this instead of re-listing all ten Pip fields itself, so a
   // future field can't be threaded into three branches and missed in a fourth.
   const result = (): PipStep => ({
-    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
+    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo, slideQueued },
     releasedBolt,
   });
+
+  // GREASED (doc §6.3): the tick after Pip visibly stood on the spill, he
+  // slides the extra slot automatically — locked against input this one
+  // tick, same as a climb or bolt release resolving.
+  if (slideQueued !== null) {
+    const dir = slideQueued;
+    const slideTo = slot + dir;
+    if (isStandable(floor, slideTo, effects.gapClosed)) slot = slideTo;
+    slideQueued = null;
+    pose = "walk";
+    return result();
+  }
 
   if (releasing > 0) {
     releasing -= 1;
@@ -155,6 +177,14 @@ function movePip(
     }
     // landed this tick: `airborne` is 0 and matches "grounded", and this tick's
     // input applies immediately — fall through to the movement switch.
+    // GREASED (doc §6.3): a jump can land square on the spill too, same as a
+    // walk — `slot` was already set to the landing slot back when "a" was
+    // pressed, so the check happens here, at the moment the lock actually
+    // releases, not there. Queued the same way either way: this tick, next
+    // tick resolves it.
+    if (grease !== null && floor === grease.floor && slot === grease.slot) {
+      slideQueued = facing;
+    }
   }
 
   switch (input) {
@@ -166,6 +196,18 @@ function movePip(
       if (isStandable(floor, target, effects.gapClosed)) {
         slot = target;
         pose = "walk";
+        // GREASED (doc §6.3): one floor/slot cell this round is a coffee-cup
+        // spill — stepping onto it lands Pip there, visible, same as any
+        // step; the extra slot the same direction resolves next tick (the
+        // slideQueued check above), not this one, so he's actually seen
+        // standing on the spill instead of skipping straight over it. An
+        // explicit `null` otherwise, not just "leave it" — the tick a jump
+        // lands square on the spill can also carry a fresh walk input (the
+        // lock releases and this tick's own input applies immediately, same
+        // tick), and that walk moving him elsewhere must cancel the slide
+        // the landing just queued, not leave it to fire from a slot he's no
+        // longer standing on.
+        slideQueued = grease !== null && floor === grease.floor && target === grease.slot ? dir : null;
       }
       break;
     }
@@ -216,6 +258,10 @@ function movePip(
       airborne = JUMP_AIR_TICKS; // > 0 for both airborne ticks; hits 0 on landing
       pose = "jump";
       if (land !== null) slot = land;
+      // A fresh jump this tick supersedes any GREASED slide the landing just
+      // above queued (the same rare double-action tick as the walk case) —
+      // he's leaving the spill under his own power, not sliding off it.
+      slideQueued = null;
       break;
     }
     case null:
@@ -228,19 +274,26 @@ function movePip(
 /* ---- phases --------------------------------------------------------------- */
 
 function stepTitle(state: GameState, input: InputAction | null): GameState {
-  const { pip } = movePip(state.pip, input, state.bolts, effectsFor(state.concessions));
+  const { pip } = movePip(state.pip, input, state.bolts, effectsFor(state.concessions), null);
   const moved = pip.floor !== state.pip.floor || pip.slot !== state.pip.slot;
   if (!moved) {
     return { ...state, tick: state.tick + 1, pip };
   }
   const params = roundParams(state.round);
+  const roll = rollModifier(state.rng, state.forcedModifier); // round 1's modifier (doc §6.3)
   return {
     ...state,
     tick: state.tick + 1,
     phase: "playing",
     pip,
+    rng: roll.rng,
+    modifier: roll.modifier,
+    modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
+    deadColumn: roll.deadColumn,
+    greaseFloor: roll.greaseFloor,
+    greaseSlot: roll.greaseSlot,
     spawnCountdown: params.hazardCadence,
-    swipeCountdown: params.swipeCadence,
+    swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     playingSince: state.tick + 1, // round 1 clock windows start now
     roundClean: true,
   };
@@ -263,7 +316,17 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       }
       // Same reset a haul gets (doc §5.5): the stage is swept clear too, not
       // just Pip — everything Bruno had thrown goes with him back to zero.
-      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip(), hazards: [] };
+      // STICKY PAD's queue goes with it too — the frozen branches above never
+      // touch it, so whatever was queued right before the hit would otherwise
+      // replay against the freshly reset Pip next tick, several ticks stale.
+      return {
+        ...state,
+        tick: state.tick + 1,
+        hitFlash,
+        pip: freshPip(),
+        hazards: [],
+        queuedInput: null,
+      };
     }
     return {
       ...state,
@@ -283,6 +346,14 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   const brunoHere = roundTick >= cp.brunoAwayUntil + effects.brunoPauseTicks || nightAwake;
   const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
   const params = roundParams(effRound);
+  // CAFFEINATED (doc §6.3): Bruno swipes twice as often; hazard cadence is
+  // untouched (params.hazardCadence is read directly, unmodified, below).
+  const swipeCadence = swipeCadenceFor(state.modifier, params.swipeCadence);
+  // STICKY PAD (doc §6.3): the buffer's usual one-tick delay doubles to two —
+  // this tick acts on last tick's input, and this tick's own input waits one
+  // more tick behind it.
+  const effectiveInput = state.modifier === "stickyPad" ? state.queuedInput : input;
+  const queuedInput = state.modifier === "stickyPad" ? input : null;
   const pipFrom = state.pip;
   let rng = state.rng;
   let misses = state.misses;
@@ -305,12 +376,24 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   }
 
   // 1 — Pip
-  const outcome = movePip(state.pip, input, state.bolts, effects);
+  const grease =
+    state.greaseFloor !== null ? { floor: state.greaseFloor, slot: state.greaseSlot! } : null;
+  const outcome = movePip(state.pip, effectiveInput, state.bolts, effects, grease);
   let pip = outcome.pip;
   let bolts = state.bolts;
+  let boltProgress = state.boltProgress;
   const hauled = outcome.releasedBolt >= 0; // a lever came down this tick
   if (hauled) {
-    bolts = bolts.map((b, i) => (i === outcome.releasedBolt ? true : b));
+    // DOUBLE BOLTS (doc §6.3): each lever needs two hauls, not one, before it
+    // actually flips to released — the console still only ever shows real
+    // completions, so no new art for the extra pull.
+    const bi = outcome.releasedBolt;
+    const needed = state.modifier === "doubleBolts" ? 2 : 1;
+    const progress = (boltProgress[bi] ?? 0) + 1;
+    boltProgress = boltProgress.map((p, i) => (i === bi ? progress : p));
+    if (progress >= needed) {
+      bolts = bolts.map((b, i) => (i === bi ? true : b));
+    }
     rawPoints += POINTS_PER_BOLT;
   }
 
@@ -321,7 +404,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     Resolved before the haul warps Pip away, so the swing still lands.
   // While Bruno is away the countdown is held at full, so on his return there is
   // always a fresh cadence — including the windup — before the first swing.
-  let swipeCountdown = brunoHere ? state.swipeCountdown - 1 : params.swipeCadence;
+  let swipeCountdown = brunoHere ? state.swipeCountdown - 1 : swipeCadence;
   let swipe = Math.max(0, state.swipe - 1);
   if (brunoHere && swipeCountdown === 1) {
     swipe = 2; // windup: arm out, no hit yet
@@ -329,7 +412,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   if (swipeCountdown <= 0) {
     // Recognition Programme: he's "visibly emotional and unpredictable" —
     // each fresh cadence jitters ±3 ticks around the table value (doc §7.2).
-    let cadence = params.swipeCadence;
+    let cadence = swipeCadence;
     if (effects.swipeJitter) {
       const [j, r2] = nextInt(rng, 7); // 0..6 -> -3..+3
       rng = r2;
@@ -355,7 +438,10 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
           (last, b, i) => (b === true && i !== outcome.releasedBolt ? i : last),
           -1,
         );
-        if (bi >= 0) bolts = bolts.map((b, i) => (i === bi ? false : b));
+        if (bi >= 0) {
+          bolts = bolts.map((b, i) => (i === bi ? false : b));
+          boltProgress = boltProgress.map((p, i) => (i === bi ? 0 : p)); // DOUBLE BOLTS: starts over
+        }
       }
     }
   }
@@ -510,6 +596,16 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   let phase = state.phase;
   let clearedCountdown = state.clearedCountdown;
   let hitFlash = 0;
+  // GREASED's spill relocates after every hit (doc §6.3) — same draw the
+  // initial roll uses, so it stays clear of floor 1/4 and off-grid slots.
+  let greaseFloor = state.greaseFloor;
+  let greaseSlot = state.greaseSlot;
+  if (tookMiss && state.modifier === "greased") {
+    const [newFloor, newSlot, r2] = rollGreaseSpill(rng);
+    rng = r2;
+    greaseFloor = newFloor;
+    greaseSlot = newSlot;
+  }
   if (tookMiss) {
     // Pause and blink first (doc-independent tuning, see HIT_FLASH_TICKS) —
     // phase stays "playing" even if this was the hit that ends the run; the
@@ -525,12 +621,16 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     clearedCountdown = ROUND_CLEARED_TICKS;
     // NIGHT pays double here, but only if Bruno never woke up (doc §7.1).
     const clearMult = state.clock === "night" && nightWoken ? 1 : cp.clearMult;
-    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult;
+    // DOUBLE BOLTS doubles the clear bonus too, not just the haul count.
+    const modMult = state.modifier === "doubleBolts" ? 2 : 1;
+    rawPoints += POINTS_PER_ROUND_CLEAR * clearMult * modMult;
   }
 
   const score =
     state.score +
     awardPoints(rawPoints, boredom, stewardAsleep, cp.points * effects.pointsMult);
+
+  const modifierAnnounceTicks = Math.max(0, state.modifierAnnounceTicks - 1);
 
   return {
     ...state,
@@ -542,6 +642,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     pip,
     hazards: survivors,
     bolts,
+    boltProgress,
     brunoSlot,
     brunoDir,
     spawnCountdown,
@@ -552,6 +653,10 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     glitchTicks,
     glitchCooldown,
     glitchPose,
+    modifierAnnounceTicks,
+    greaseFloor,
+    greaseSlot,
+    queuedInput,
     moveStreak,
     nightNoise,
     nightWoken,
@@ -651,6 +756,10 @@ function beginNextRound(state: GameState): GameState {
     stuckLit = l;
   }
 
+  // A fresh modifier every round (doc §6.3) — repeats across rounds allowed.
+  const roll = rollModifier(rng, state.forcedModifier);
+  rng = roll.rng;
+
   return {
     ...state,
     tick: state.tick + 1,
@@ -664,10 +773,11 @@ function beginNextRound(state: GameState): GameState {
     pip: freshPip(),
     hazards: [],
     bolts: state.bolts.map(() => false),
+    boltProgress: state.boltProgress.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
     spawnCountdown: params.hazardCadence,
-    swipeCountdown: params.swipeCadence,
+    swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     swipe: 0,
     clearedCountdown: 0,
     hitFlash: 0,
@@ -680,5 +790,11 @@ function beginNextRound(state: GameState): GameState {
     moveStreak: 0,
     nightNoise: 0,
     nightWoken: false, // a fresh round is a fresh chance to sneak past him
+    modifier: roll.modifier,
+    modifierAnnounceTicks: MODIFIER_ANNOUNCE_TICKS,
+    deadColumn: roll.deadColumn,
+    greaseFloor: roll.greaseFloor,
+    greaseSlot: roll.greaseSlot,
+    queuedInput: null,
   };
 }

@@ -9,6 +9,7 @@ import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen, isStandable } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
 import { CONCESSION_CARDS } from "../sim/grievance";
+import { MODIFIER_LABEL } from "../sim/modifiers";
 import type { Screen } from "./types";
 import type { TextSpec } from "./text";
 import { PANEL_W } from "./dims";
@@ -42,7 +43,12 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const blinkedOut =
     state.hitFlash > 0 && Math.floor((state.hitFlash - 1) / HIT_BLINK_HALF_PERIOD) % 2 === 1;
 
-  if (showArt && !blinkedOut && floorScreen(p.floor) === screen) {
+  // DEAD COLUMN (doc §6.3): "Pip is invisible while standing in it" — scoped
+  // to Pip only. A hazard sharing that slot still lights normally: a
+  // camouflage perk, not a source of invisible, untelegraphed hits.
+  const inDeadColumn = state.deadColumn !== null && p.slot === state.deadColumn;
+
+  if (showArt && !blinkedOut && !inDeadColumn && floorScreen(p.floor) === screen) {
     // A low battery can leave this exact pose-cell stuck dark — Pip vanishes.
     if (!sameCell(state.stuckDark, p.floor, p.slot, p.pose)) {
       const face = p.facing === 1 ? "r" : "l";
@@ -71,6 +77,13 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     for (const h of state.hazards) {
       if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
     }
+  }
+
+  // GREASED's spill (doc §6.3): painted for the whole round at its one
+  // floor/slot cell — not tied to the hazard list, since it never moves and
+  // never expires like one does.
+  if (showArt && state.greaseFloor !== null && floorScreen(state.greaseFloor) === screen) {
+    lit.add(`grease.f${state.greaseFloor}.s${state.greaseSlot}`);
   }
 
   if (screen === "upper" && showArt) {
@@ -146,6 +159,19 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
         cell: 7,
         kind: "seg7",
         align: "right",
+      });
+    }
+
+    // The round's modifier (doc §6.3) announces itself for a beat at the top
+    // of the round, then gets out of the way — same slot ROUND CLEAR uses.
+    if (state.phase === "playing" && state.modifier && state.modifierAnnounceTicks > 0) {
+      texts.push({
+        text: MODIFIER_LABEL[state.modifier],
+        x: PANEL_W / 2,
+        y: 14,
+        cell: 8,
+        kind: "seg14",
+        align: "center",
       });
     }
 
