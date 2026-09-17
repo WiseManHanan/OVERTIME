@@ -187,7 +187,12 @@ function viewFor(screen: Screen): PanelView {
     contrast: batteryContrast(state.battery),
     blackout,
     hideBackdrop: state.phase === "mediation",
-    brightFloor: state.modifier === "nightShift" ? state.pip.floor : null,
+    // Gated to "playing": a haul resets `pip` (freshPip, floor 1) the same
+    // tick the round clears, so reading pip.floor once "cleared" would dim
+    // the whole platform-falls-with-Bruno celebration (all fixed on floor 4)
+    // for the rest of the window — the modifier's business is done once the
+    // round is.
+    brightFloor: state.modifier === "nightShift" && state.phase === "playing" ? state.pip.floor : null,
   };
 }
 

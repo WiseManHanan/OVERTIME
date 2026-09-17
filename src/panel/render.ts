@@ -10,7 +10,7 @@
  *
  * `renderPanel` is read-only with respect to game state (invariant 3).
  */
-import type { Screen } from "./types";
+import type { Screen, Seg } from "./types";
 import type { Palette } from "./colors";
 import { PANEL_W, PANEL_H } from "./dims";
 import { atlasFor } from "./atlas";
@@ -106,20 +106,21 @@ export function renderPanel(
         if (selfTest || view.lit.has(seg.id)) ctx.fill(pathForSeg(seg));
       }
     } else {
-      // NIGHT SHIFT: dimmed pass first, then Pip's own floor at full contrast —
-      // same segment set, two alpha passes, each segment drawn exactly once.
+      // NIGHT SHIFT: dimmed pass first, then Pip's own floor at full contrast.
+      // A `null` floor (the Steward, miss pips, boredom meter — HUD, not the
+      // scaffold) always lands in the bright bucket: one classification pass
+      // per segment sorts each into exactly one of the two.
+      const dim: Seg[] = [];
+      const bright: Seg[] = [];
+      for (const seg of segs) {
+        if (!selfTest && !view.lit.has(seg.id)) continue;
+        const floor = segFloor(seg.id);
+        (floor === null || floor === brightFloor ? bright : dim).push(seg);
+      }
       ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast * NIGHT_SHIFT_DIM);
-      for (const seg of segs) {
-        if ((selfTest || view.lit.has(seg.id)) && segFloor(seg.id) !== brightFloor) {
-          ctx.fill(pathForSeg(seg));
-        }
-      }
+      for (const seg of dim) ctx.fill(pathForSeg(seg));
       ctx.globalAlpha = selfTest ? 1 : clamp01(view.contrast);
-      for (const seg of segs) {
-        if ((selfTest || view.lit.has(seg.id)) && segFloor(seg.id) === brightFloor) {
-          ctx.fill(pathForSeg(seg));
-        }
-      }
+      for (const seg of bright) ctx.fill(pathForSeg(seg));
     }
   }
 

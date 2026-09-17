@@ -276,7 +276,17 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       }
       // Same reset a haul gets (doc §5.5): the stage is swept clear too, not
       // just Pip — everything Bruno had thrown goes with him back to zero.
-      return { ...state, tick: state.tick + 1, hitFlash, pip: freshPip(), hazards: [] };
+      // STICKY PAD's queue goes with it too — the frozen branches above never
+      // touch it, so whatever was queued right before the hit would otherwise
+      // replay against the freshly reset Pip next tick, several ticks stale.
+      return {
+        ...state,
+        tick: state.tick + 1,
+        hitFlash,
+        pip: freshPip(),
+        hazards: [],
+        queuedInput: null,
+      };
     }
     return {
       ...state,

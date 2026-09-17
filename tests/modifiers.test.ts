@@ -178,6 +178,22 @@ describe("STICKY PAD (doc §6.3)", () => {
     s = step(s, null); // last tick's "right" lands now
     expect(s.pip.slot).toBe(6);
   });
+
+  it("a hit clears the queued input, so it can't replay against the reset Pip", () => {
+    let s = playing({
+      modifier: "stickyPad",
+      pip: { ...initialState(1).pip, floor: 1, slot: 7 },
+    });
+    s = step(s, "right"); // queued
+    expect(s.queuedInput).toBe("right");
+    // Bruno's swipe lands before that queued "right" is ever acted on.
+    s = { ...s, hitFlash: 1 };
+    s = step(s, null); // hitFlash 1 -> 0: survived-hit reset (pip, hazards)
+    expect(s.pip.slot).toBe(5); // freshPip's start slot — the reset landed
+    expect(s.queuedInput).toBeNull();
+    s = step(s, null); // first fully unfrozen tick
+    expect(s.pip.slot).toBe(5); // the stale "right" never gets replayed
+  });
 });
 
 describe("forcedModifier (?modifier=, doc §6.3 playtest hook)", () => {

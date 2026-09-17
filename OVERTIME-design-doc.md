@@ -291,13 +291,13 @@ At round start, the seeded RNG draws one modifier. It is announced on the lower 
 
 | Modifier | Effect |
 |---|---|
-| `DEAD COLUMN` | One slot column's segments never light. Pip is invisible while standing in it. |
+| `DEAD COLUMN` | One slot column's Pip segments never light — he's invisible standing in it, any floor. A camouflage perk only: a hazard sharing that slot still lights normally, so it's never an invisible, untelegraphed hit. |
 | `CAFFEINATED` | Bruno's swipe cadence halves, hazard cadence unchanged. |
 | `GREASED` | All floors behave as slick (see coffee cup). |
-| `DOUBLE BOLTS` | Eight bolt stations instead of four, but round-clear points double. |
+| `DOUBLE BOLTS` | Same 4 console levers, but each takes two hauls before its holder actually releases — no new art, the console only ever shows real completions. Round-clear points double. |
 | `STICKY PAD` | Input buffer delay increases to 2 ticks. |
 | `SILENT RUNNING` | Audio muted; the Steward mimes his commentary instead. |
-| `NIGHT SHIFT` | Panel contrast drops 40%. Only lit segments in Pip's current floor render at full. |
+| `NIGHT SHIFT` | Panel contrast drops sharply outside Pip's current floor (tuned well past the initial -40% pass — a duller-but-still-solid segment didn't read as "in the dark"). Only lit segments on Pip's floor, or off-scaffold HUD (Steward, miss pips, boredom meter), render at full. |
 
 ### 6.4 Daily seed
 

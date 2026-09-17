@@ -43,8 +43,9 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   const blinkedOut =
     state.hitFlash > 0 && Math.floor((state.hitFlash - 1) / HIT_BLINK_HALF_PERIOD) % 2 === 1;
 
-  // DEAD COLUMN (doc §6.3): one slot's segments never light, any floor —
-  // Pip (and anything else standing in it) simply isn't there.
+  // DEAD COLUMN (doc §6.3): "Pip is invisible while standing in it" — scoped
+  // to Pip only. A hazard sharing that slot still lights normally: a
+  // camouflage perk, not a source of invisible, untelegraphed hits.
   const inDeadColumn = state.deadColumn !== null && p.slot === state.deadColumn;
 
   if (showArt && !blinkedOut && !inDeadColumn && floorScreen(p.floor) === screen) {
@@ -74,7 +75,6 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
 
   if (showArt) {
     for (const h of state.hazards) {
-      if (h.slot === state.deadColumn) continue;
       if (floorScreen(h.floor) === screen) lit.add(`${h.kind}.f${h.floor}.s${h.slot}`);
     }
   }
