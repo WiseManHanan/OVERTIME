@@ -43,17 +43,28 @@ export interface PanelView {
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
-/** -40% contrast on everything outside Pip's current floor (doc §6.3). */
-const NIGHT_SHIFT_DIM = 0.6;
+/** Contrast on everything outside Pip's current floor (doc §6.3 calls for
+ *  "-40%", i.e. 0.6 — turned up further here because at 0.6 a lit segment
+ *  reads as merely a slightly duller version of itself, not "in the dark":
+ *  --segment (near-black) over --lcd-bg blends to a medium olive at 0.6,
+ *  nowhere near --ghost's near-invisible 0.072. This sits partway there
+ *  instead, so the spotlighted floor actually pops against the rest. */
+const NIGHT_SHIFT_DIM = 0.3;
 
-// Only these three kinds carry a floor in their id (doc §4.3's atlas ids) —
-// Bruno, the console, holders and the Steward have no floor of their own and
-// default to the dimmed pass.
+// pip/barrel/chair ids carry their floor directly. Bruno's whole rig — his
+// pacing and swipe frames, the fall animation, the platform, gantry and
+// holders — plus the one console all live fixed on floor 4 and should read
+// as floor 4's fixtures, not a permanent dim regardless of where Pip stands.
+// The Steward and the miss/boredom readouts are HUD, not the scaffold — no
+// floor applies, so they're excluded here and always render at full contrast.
 const FLOOR_ID = /^(?:pip|barrel|chair)\.f(\d+)\./;
+const FLOOR_4_FIXTURE = /^(?:bruno\.|gantry|holder\.|console\.)/;
+const FLOOR_4 = 4;
 
 function segFloor(id: string): number | null {
   const m = FLOOR_ID.exec(id);
-  return m ? Number(m[1]) : null;
+  if (m) return Number(m[1]);
+  return FLOOR_4_FIXTURE.test(id) ? FLOOR_4 : null;
 }
 
 export function renderPanel(
