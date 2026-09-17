@@ -111,17 +111,30 @@ function movePip(
   effects: GrievanceEffects,
   grease: { floor: Floor; slot: number } | null,
 ): PipStep {
-  let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo } = p;
+  let { floor, slot, facing, airborne, releasing, releasingBolt, climbing, climbTo, slideQueued } =
+    p;
   let pose: PipPose = "stand";
   let releasedBolt = -1;
   const boltTicks = effects.boltReleaseTicks ?? BOLT_RELEASE_TICKS;
   // One place that reads the current bindings into a PipStep — every exit
-  // below calls this instead of re-listing all nine Pip fields itself, so a
+  // below calls this instead of re-listing all ten Pip fields itself, so a
   // future field can't be threaded into three branches and missed in a fourth.
   const result = (): PipStep => ({
-    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo },
+    pip: { floor, slot, facing, pose, airborne, releasing, releasingBolt, climbing, climbTo, slideQueued },
     releasedBolt,
   });
+
+  // GREASED (doc §6.3): the tick after Pip visibly stood on the spill, he
+  // slides the extra slot automatically — locked against input this one
+  // tick, same as a climb or bolt release resolving.
+  if (slideQueued !== null) {
+    const dir = slideQueued;
+    const slideTo = slot + dir;
+    if (isStandable(floor, slideTo, effects.gapClosed)) slot = slideTo;
+    slideQueued = null;
+    pose = "walk";
+    return result();
+  }
 
   if (releasing > 0) {
     releasing -= 1;
@@ -168,12 +181,12 @@ function movePip(
         slot = target;
         pose = "walk";
         // GREASED (doc §6.3): one floor/slot cell this round is a coffee-cup
-        // spill — stepping onto it carries Pip one extra slot the same
-        // direction, falling back to just the one step if the far side isn't
-        // somewhere Pip could stand.
+        // spill — stepping onto it lands Pip there, visible, same as any
+        // step; the extra slot the same direction resolves next tick (the
+        // slideQueued check above), not this one, so he's actually seen
+        // standing on the spill instead of skipping straight over it.
         if (grease !== null && floor === grease.floor && target === grease.slot) {
-          const slideTo = slot + dir;
-          if (isStandable(floor, slideTo, effects.gapClosed)) slot = slideTo;
+          slideQueued = dir;
         }
       }
       break;

@@ -47,6 +47,11 @@ export interface Pip {
    *  like a bolt release. `>0` means locked; `climbTo` is the floor it lands on. */
   climbing: number;
   climbTo: Floor | null;
+  /** GREASED's spill (doc §6.3): set the tick Pip steps onto the marked slot —
+   *  he stands there visible this tick, then next tick automatically slides
+   *  one more slot this direction, input or not (like a locked climb/release).
+   *  `null` once resolved, or any round GREASED isn't in effect. */
+  slideQueued: Facing | null;
 }
 
 export interface GameState {
@@ -206,6 +211,7 @@ export function freshPip(): Pip {
     releasingBolt: -1,
     climbing: 0,
     climbTo: null,
+    slideQueued: null,
   };
 }
 

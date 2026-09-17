@@ -36,6 +36,7 @@ describe("rollModifier (doc §6.3)", () => {
       } else if (roll.modifier === "greased") {
         expect(roll.deadColumn).toBeNull();
         expect(roll.greaseFloor).not.toBeNull();
+        expect(roll.greaseFloor).not.toBe(1); // never the start floor
         expect(roll.greaseFloor).not.toBe(4); // never Bruno's deck
         expect(roll.greaseSlot).not.toBeNull();
         expect(roll.greaseSlot!).toBeGreaterThanOrEqual(MIN_SLOT);
@@ -75,6 +76,7 @@ describe("rollModifier (doc §6.3)", () => {
       rng = roll.rng;
       expect(roll.modifier).toBe("greased");
       expect(roll.greaseFloor).not.toBeNull();
+      expect(roll.greaseFloor).not.toBe(1);
       expect(roll.greaseFloor).not.toBe(4);
       floors.add(roll.greaseFloor!);
     }
@@ -83,48 +85,68 @@ describe("rollModifier (doc §6.3)", () => {
 });
 
 describe("GREASED (doc §6.3)", () => {
-  it("stepping onto the spill carries Pip one extra slot the same direction", () => {
+  it("stepping onto the spill lands Pip there first — no skipping over it", () => {
     const s = playing({
       modifier: "greased",
-      greaseFloor: 1,
+      greaseFloor: 2,
       greaseSlot: 6,
-      pip: { ...initialState(1).pip, floor: 1, slot: 5 },
+      pip: { ...initialState(1).pip, floor: 2, slot: 5 },
     });
-    const next = step(s, "right"); // steps onto slot 6 — the spill
-    expect(next.pip.slot).toBe(7); // one ordinary step, plus the slick's extra
+    const onSpill = step(s, "right"); // steps onto slot 6 — the spill itself
+    expect(onSpill.pip.slot).toBe(6); // visibly standing on it, not slot 7
+    expect(onSpill.pip.slideQueued).toBe(1); // the extra slide is queued...
+    const after = step(onSpill, null); // ...and resolves next tick, input or not
+    expect(after.pip.slot).toBe(7);
+    expect(after.pip.slideQueued).toBeNull();
+  });
+
+  it("the queued slide fires even if a different key is pressed that tick", () => {
+    const s = playing({
+      modifier: "greased",
+      greaseFloor: 2,
+      greaseSlot: 6,
+      pip: { ...initialState(1).pip, floor: 2, slot: 5 },
+    });
+    const onSpill = step(s, "right");
+    const after = step(onSpill, "left"); // locked against input, like a climb
+    expect(after.pip.slot).toBe(7); // still slides forward, not left
   });
 
   it("an ordinary step elsewhere on the same floor is unaffected", () => {
     const s = playing({
       modifier: "greased",
-      greaseFloor: 1,
+      greaseFloor: 2,
       greaseSlot: 6,
-      pip: { ...initialState(1).pip, floor: 1, slot: 1 },
+      pip: { ...initialState(1).pip, floor: 2, slot: 1 },
     });
     const next = step(s, "right"); // nowhere near slot 6
     expect(next.pip.slot).toBe(2);
+    expect(next.pip.slideQueued).toBeNull();
   });
 
   it("the spill doesn't reach across floors, even at the same slot number", () => {
     const s = playing({
       modifier: "greased",
-      greaseFloor: 3, // not floor 1
+      greaseFloor: 3, // not floor 2
       greaseSlot: 6,
-      pip: { ...initialState(1).pip, floor: 1, slot: 5 },
+      pip: { ...initialState(1).pip, floor: 2, slot: 5 },
     });
     const next = step(s, "right");
-    expect(next.pip.slot).toBe(6); // an ordinary step, no slide
+    expect(next.pip.slot).toBe(6); // an ordinary step, no slide queued
+    expect(next.pip.slideQueued).toBeNull();
   });
 
   it("falls back to a single step when the extra slot isn't standable", () => {
     const s = playing({
       modifier: "greased",
-      greaseFloor: 1,
+      greaseFloor: 2,
       greaseSlot: MAX_SLOT,
-      pip: { ...initialState(1).pip, floor: 1, slot: MAX_SLOT - 1 },
+      pip: { ...initialState(1).pip, floor: 2, slot: MAX_SLOT - 1 },
     });
-    const next = step(s, "right"); // steps onto the spill, right at the edge
-    expect(next.pip.slot).toBe(MAX_SLOT); // slid to the edge, no further
+    const onSpill = step(s, "right"); // steps onto the spill, right at the edge
+    expect(onSpill.pip.slot).toBe(MAX_SLOT);
+    const after = step(onSpill, null);
+    expect(after.pip.slot).toBe(MAX_SLOT); // no further — the edge holds
   });
 
   it("an ordinary round (no spill this round) takes just the one step", () => {
@@ -272,6 +294,7 @@ describe("forcedModifier (?modifier=, doc §6.3 playtest hook)", () => {
     s = step(s, "right"); // title -> playing
     expect(s.modifier).toBe("greased");
     expect(s.greaseFloor).not.toBeNull();
+    expect(s.greaseFloor).not.toBe(1);
     expect(s.greaseFloor).not.toBe(4);
     expect(s.greaseSlot).not.toBeNull();
   });

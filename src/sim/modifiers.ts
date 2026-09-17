@@ -41,9 +41,10 @@ const MODIFIERS: readonly Modifier[] = [
   "nightShift",
 ];
 
-/** GREASED never spills on floor 4 — Bruno's deck, the console and holders,
- *  not a place Pip is meant to be sliding around unannounced. */
-const GREASE_FLOORS: readonly Floor[] = FLOORS.filter((f) => f !== 4);
+/** GREASED never spills on floor 1 (the start, right under the round's first
+ *  few steps) or floor 4 (Bruno's deck, the console and holders) — floors 2
+ *  and 3 only. */
+const GREASE_FLOORS: readonly Floor[] = FLOORS.filter((f) => f !== 1 && f !== 4);
 
 /** Type guard for `?modifier=` (main.ts) — any other string is ignored. */
 export function isModifier(x: string): x is Modifier {
