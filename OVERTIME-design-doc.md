@@ -287,7 +287,7 @@ latch — it only releases once the meter is back below 66.
 
 ### 6.3 Round modifiers
 
-At round start, the seeded RNG draws one modifier. It is announced on the lower screen in 14-segment capitals for 12 ticks.
+From round 3 on, round start draws one modifier from the seeded RNG. The first two rounds are the plain climb, no modifier, same as chairs waiting for round 3 (§5.4) before the game layers on a twist. It is announced on the lower screen in 14-segment capitals for 12 ticks.
 
 | Modifier | Effect |
 |---|---|

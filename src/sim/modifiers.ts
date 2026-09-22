@@ -31,6 +31,11 @@ export const MODIFIER_LABEL: Record<Modifier, string> = {
   nightShift: "NIGHT SHIFT",
 };
 
+/** Modifiers hold off until this round (doc §6.3) — the first two rounds are
+ *  the plain climb, same as chairs waiting for CHAIR_UNLOCK_ROUND (hazards.ts)
+ *  before layering on a twist. */
+export const MODIFIER_UNLOCK_ROUND = 3;
+
 const MODIFIERS: readonly Modifier[] = [
   "deadColumn",
   "caffeinated",
@@ -52,7 +57,8 @@ export function isModifier(x: string): x is Modifier {
 }
 
 export interface ModifierRoll {
-  modifier: Modifier;
+  /** `null` before MODIFIER_UNLOCK_ROUND — no modifier drawn this round. */
+  modifier: Modifier | null;
   /** Only meaningful when `modifier` is "deadColumn" — the one slot, every
    *  floor, that never lights this round. */
   deadColumn: number | null;
@@ -97,14 +103,24 @@ export function rollGreaseSpill(rng: RngState): [Floor, number, RngState] {
 const NO_SPILL = { deadColumn: null, greaseFloor: null, greaseSlot: null } as const;
 
 /** One modifier, drawn uniformly (doc doesn't call for weighting, unlike
- *  Mara's old ratings) — repeats across rounds are allowed.
+ *  Mara's old ratings) — repeats across rounds are allowed. `round` gates it:
+ *  below MODIFIER_UNLOCK_ROUND, no draw happens at all — `modifier` comes
+ *  back `null` and `rng` is untouched, the same "leave the stream alone"
+ *  shape NO_SPILL already uses for the non-slot modifiers.
  *
- *  `force`, when given, skips the draw and always returns that modifier —
- *  `GameState.forcedModifier`, a debug/playtest override (`?modifier=` in
- *  main.ts) for playing a specific one on demand. DEAD COLUMN and GREASED
- *  still roll their slot off the RNG either way, so a forced run isn't
- *  stuck on one column or one spill. */
-export function rollModifier(rng: RngState, force: Modifier | null = null): ModifierRoll {
+ *  `force`, when given, skips both the gate and the draw and always returns
+ *  that modifier — `GameState.forcedModifier`, a debug/playtest override
+ *  (`?modifier=` in main.ts) for playing a specific one on demand, round 1
+ *  included. DEAD COLUMN and GREASED still roll their slot off the RNG
+ *  either way, so a forced run isn't stuck on one column or one spill. */
+export function rollModifier(
+  rng: RngState,
+  round: number,
+  force: Modifier | null = null,
+): ModifierRoll {
+  if (force === null && round < MODIFIER_UNLOCK_ROUND) {
+    return { modifier: null, ...NO_SPILL, rng };
+  }
   const [modifier, r1] =
     force !== null ? [force, rng] : (() => {
       const [i, r] = nextInt(rng, MODIFIERS.length);
