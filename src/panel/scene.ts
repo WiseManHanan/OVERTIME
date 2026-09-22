@@ -110,14 +110,12 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     const down = state.bolts.filter(Boolean).length;
     const hauling = p.releasing > 0 && state.tick % 2 === 0;
     lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
-
-    for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
   }
 
   if (screen === "upper" && live) {
     if (state.phase !== "title") {
       // One line across the very top-left: above Pip's tallest reach on floor 4
-      // (y ~13), and clear of the miss pips (top-centre) and gantry (top-right).
+      // (y ~13), and clear of the gantry (top-right).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
     }
@@ -147,6 +145,12 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     // character steps aside for it.
     if (state.phase !== "mediation") {
       lit.add(`steward.${stewardMood(state.boredom, state.stewardAsleep)}`);
+    }
+
+    // The three strike figures, top-centre — moved here from the upper panel
+    // (doc §4.3), where Bruno's pacing beat used to walk right over them.
+    if (showArt) {
+      for (let i = 0; i < Math.min(state.misses, 3); i++) lit.add(`miss.p${i}`);
     }
 
     if (state.phase === "playing" || state.phase === "cleared") {
