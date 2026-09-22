@@ -580,14 +580,19 @@ function holderSeg(i: number): Seg {
 /** The one lever left on the floor-4 console, standing in for all four
  *  holders. Its base is planted dead centre on the housing and never moves;
  *  only the shaft swings, 60° off horizontal (30° off vertical) either side
- *  of that fixed pivot. `pulled` (0..4) only decides which side it rests on:
- *  a completed haul flips it to its mirror position — the base held fixed by
- *  `mirror`'s axis sitting exactly on the pivot — so every holder drop reads
- *  as the same lever swinging over, not relocating (doc §5.5). The console's
- *  body and readout strip are printed backdrop now (backdrop.ts
- *  `consoleHousing`, same `--print-red` ink as the platforms) — fixed,
- *  un-ghosted furniture; only the lever itself is a segment that lights. */
-function consoleSeg(pulled: number): Seg {
+ *  of that fixed pivot. Only two geometries ever exist — `side` 0 (left) or 1
+ *  (right, `mirror`'s axis sitting exactly on the pivot so the base holds
+ *  fixed) — so the atlas registers exactly two segments, not one per holder
+ *  count: five ids that all alias down to two shapes would stack identical
+ *  fills in the ghost pass (doc §4.3 step 3 draws every atlas segment,
+ *  unconditionally) and smear that spot darker than every other ghost on the
+ *  panel. scene.ts lights `console.p${count % 2}` — a completed haul flips
+ *  it to its mirror position, so every holder drop still reads as the same
+ *  lever swinging over, not relocating (doc §5.5). The console's body and
+ *  readout strip are printed backdrop now (backdrop.ts `consoleHousing`,
+ *  same `--print-red` ink as the platforms) — fixed, un-ghosted furniture;
+ *  only the lever itself is a segment that lights. */
+function consoleSeg(side: 0 | 1): Seg {
   const cx = slotCenterX(CONSOLE_SLOT);
   const deck = floorBaselineY("upper", 0);
   // Pivot at the housing's top edge. Shaft length 8, leaning left at 30° off
@@ -608,8 +613,8 @@ function consoleSeg(pulled: number): Seg {
     ]), // shaft
     { k: "circle", cx: tipX, cy: tipY, r: 1.2 }, // knob
   ];
-  const shapes = pulled % 2 === 1 ? mirror(lever, cx) : lever;
-  return { id: `console.p${pulled}`, screen: "upper", shapes };
+  const shapes = side === 1 ? mirror(lever, cx) : lever;
+  return { id: `console.p${side}`, screen: "upper", shapes };
 }
 
 /** A tiny standing figure for each strike — Pip's own silhouette in
@@ -734,11 +739,14 @@ function build(): Seg[] {
   }
 
   // Bruno's platform: one beam on a west anchor, its free end on the gantry by
-  // four holders. Console: one bank of levers, in its five states (0..4 pulled).
+  // four holders. Console: one lever, in its two mirrored resting positions —
+  // not one segment per holder count, so the ghost pass below (doc §4.3 step
+  // 3, unconditional over the whole atlas) never stacks the same shape on
+  // itself.
   segs.push(brunoPlatformSeg());
   segs.push(gantrySeg());
   for (let i = 0; i < BOLT_SLOTS.length; i++) segs.push(holderSeg(i));
-  for (let n = 0; n <= 4; n++) segs.push(consoleSeg(n));
+  segs.push(consoleSeg(0), consoleSeg(1));
 
   // Bruno paces slots BRUNO_MIN_SLOT..BRUNO_MAX_SLOT, facing his direction of
   // travel. Pace poses ghost; the transient swing does not (see Seg.noGhost).

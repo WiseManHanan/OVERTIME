@@ -111,7 +111,7 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
     // doesn't carry over — with a single lever it read as the flip stuttering
     // back and forth instead of a preview.
     const down = state.bolts.filter(Boolean).length;
-    lit.add(`console.p${down}`);
+    lit.add(`console.p${down % 2}`); // only two lever segments exist (atlas.ts)
   }
 
   if (screen === "upper" && live) {
