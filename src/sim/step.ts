@@ -333,6 +333,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       tick: state.tick + 1,
       hitFlash,
       swipe: Math.max(0, state.swipe - 1), // let a mid-swing arm settle, as stepCleared does
+      throwing: Math.max(0, state.throwing - 1),
     };
   }
 
@@ -521,7 +522,14 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   //     nothing is thrown while Bruno is away (LUNCH / NIGHT). Longer Breaks
   //     trades the pause above for a second hazard riding with the first once
   //     he's back (doc §7.2).
+  //     The throw pose (arms up, barrel in hand) shows one tick early too —
+  //     the same windup-then-hit shape as the swipe above — then holds
+  //     through the spawn tick itself before settling back to pace.
   let spawnCountdown = hauled ? params.hazardCadence : state.spawnCountdown - 1;
+  let throwing = Math.max(0, state.throwing - 1);
+  if (brunoHere && !hauled && spawnCountdown === 1) {
+    throwing = 2; // windup: arms up, nothing thrown yet
+  }
   if (brunoHere && !hauled && spawnCountdown <= 0) {
     const [hazard, next] = spawnHazard(brunoSlot, state.round, rng);
     rng = next;
@@ -536,6 +544,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
       survivors.push({ ...hazard2, dir: (-hazard.dir) as -1 | 1 });
     }
     spawnCountdown = params.hazardCadence;
+    throwing = 2; // the throw itself
   }
 
   // 5b — segment awareness (doc §7.4): roughly once per 400 ticks the wrong
@@ -646,6 +655,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     brunoSlot,
     brunoDir,
     spawnCountdown,
+    throwing,
     swipeCountdown,
     swipe,
     clearedCountdown,
@@ -677,6 +687,7 @@ function stepCleared(state: GameState): GameState {
       tick: state.tick + 1,
       clearedCountdown: n,
       swipe: Math.max(0, state.swipe - 1),
+      throwing: Math.max(0, state.throwing - 1),
     };
   }
 
@@ -779,6 +790,7 @@ function beginNextRound(state: GameState): GameState {
     spawnCountdown: params.hazardCadence,
     swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     swipe: 0,
+    throwing: 0,
     clearedCountdown: 0,
     hitFlash: 0,
     mediationCards: [],
