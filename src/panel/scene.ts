@@ -105,11 +105,13 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       });
     }
 
-    // The one console: as many levers down as holders cut, plus a flicker to the
-    // next while Pip is hauling it (doc §5.5).
+    // The one console, one lever: it holds still through the whole haul and
+    // flips to its mirror position, once, the instant a holder actually cuts
+    // loose (doc §5.5). The old bank-of-four flicker-ahead-while-hauling cue
+    // doesn't carry over — with a single lever it read as the flip stuttering
+    // back and forth instead of a preview.
     const down = state.bolts.filter(Boolean).length;
-    const hauling = p.releasing > 0 && state.tick % 2 === 0;
-    lit.add(`console.p${Math.min(4, hauling ? down + 1 : down)}`);
+    lit.add(`console.p${down}`);
   }
 
   if (screen === "upper" && live) {
