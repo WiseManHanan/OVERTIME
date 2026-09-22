@@ -577,27 +577,38 @@ function holderSeg(i: number): Seg {
   };
 }
 
-/** The one control console on the floor-4 deck by the holders: a bank of four
- *  levers. `pulled` (0..4) levers are hauled — their sockets sit empty, left to
- *  right, one per holder cut loose; the rest stand upright (doc §5.5). */
+/** The one lever left on the floor-4 console, standing in for all four
+ *  holders. Its base is planted dead centre on the housing and never moves;
+ *  only the shaft swings, 60° off horizontal (30° off vertical) either side
+ *  of that fixed pivot. `pulled` (0..4) only decides which side it rests on:
+ *  a completed haul flips it to its mirror position — the base held fixed by
+ *  `mirror`'s axis sitting exactly on the pivot — so every holder drop reads
+ *  as the same lever swinging over, not relocating (doc §5.5). The console's
+ *  body and readout strip are printed backdrop now (backdrop.ts
+ *  `consoleHousing`, same `--print-red` ink as the platforms) — fixed,
+ *  un-ghosted furniture; only the lever itself is a segment that lights. */
 function consoleSeg(pulled: number): Seg {
   const cx = slotCenterX(CONSOLE_SLOT);
   const deck = floorBaselineY("upper", 0);
-  const shapes: Shape[] = [
-    rect(cx - 7.5, deck - 5.6, 15, 5.6), // console body
-    rect(cx - 6.4, deck - 3.8, 12.8, 1.6), // readout strip
+  // Pivot at the housing's top edge. Shaft length 8, leaning left at 30° off
+  // vertical (sin 30°=0.5, cos 30°=0.866) — the mirrored (right-leaning) rest
+  // position is `mirror`'s job below, not a second set of coordinates here.
+  const bx = cx;
+  const by = deck - 5.6;
+  const tipX = bx - 4;
+  const tipY = by - 6.93;
+  // Perpendicular to the shaft (0.866, -0.5), for a tapered bar rather than a
+  // hairline: half-width 1 at the base, 0.6 at the tip.
+  const lever: Shape[] = [
+    poly([
+      [bx + 0.87, by - 0.5],
+      [tipX + 0.52, tipY - 0.3],
+      [tipX - 0.52, tipY + 0.3],
+      [bx - 0.87, by + 0.5],
+    ]), // shaft
+    { k: "circle", cx: tipX, cy: tipY, r: 1.2 }, // knob
   ];
-  for (let i = 0; i < 4; i++) {
-    const lx = cx - 5.4 + i * 3.6;
-    if (i < pulled) {
-      shapes.push(rect(lx - 1, deck - 6, 2.2, 1.3)); // empty socket
-    } else {
-      shapes.push(
-        poly([[lx - 0.8, deck - 5.6], [lx + 0.6, deck - 5.6], [lx + 1.2, deck - 11], [lx - 0.2, deck - 11]]), // lever
-        rect(lx, deck - 12.2, 1.6, 1.6), // knob
-      );
-    }
-  }
+  const shapes = pulled % 2 === 1 ? mirror(lever, cx) : lever;
   return { id: `console.p${pulled}`, screen: "upper", shapes };
 }
 

@@ -16,6 +16,7 @@
 import type { Screen } from "./types";
 import type { Palette } from "./colors";
 import { PANEL_W, PANEL_H, SLOT_W, slotCenterX, floorBaselineY } from "./dims";
+import { CONSOLE_SLOT } from "../sim/state";
 
 /** Girders and ladders — what Pip stands and climbs on. Bold, not muted. */
 const STRUCTURE_ALPHA = 0.95;
@@ -112,6 +113,21 @@ function ladderAtSlot(
   for (let y = yHigh + 3; y < yLow; y += 5) ctx.fillRect(x, y, 9.5, 2);
 }
 
+/** The lever console's housing: body and readout strip, printed and fixed —
+ *  only the levers themselves (atlas.ts `console.p{n}`) animate, riding on
+ *  top of this at the same coordinates (doc §3.1: printed colour is
+ *  decoration, never the carrier of game state). Bolted structure like the
+ *  platforms it sits beside, so it prints in the same ink, at the same
+ *  opaque structure alpha, not the fainter scenery band. */
+function consoleHousing(ctx: CanvasRenderingContext2D, pal: Palette): void {
+  const cx = slotCenterX(CONSOLE_SLOT);
+  const deck = floorBaselineY("upper", 0);
+  ctx.globalAlpha = STRUCTURE_ALPHA;
+  ctx.fillStyle = pal.printRed;
+  ctx.fillRect(cx - 7.5, deck - 5.6, 15, 5.6); // console body
+  ctx.fillRect(cx - 6.4, deck - 3.8, 12.8, 1.6); // readout strip
+}
+
 function chevrons(ctx: CanvasRenderingContext2D, pal: Palette, y: number): void {
   ctx.globalAlpha = DECO_ALPHA;
   ctx.fillStyle = pal.printYellow;
@@ -145,6 +161,7 @@ function drawUpper(ctx: CanvasRenderingContext2D, pal: Palette): void {
   plate(ctx, pal, f3);
   ladderAtSlot(ctx, pal, 9, f3, f4); // floor 3 -> floor 4
   ladderAtSlot(ctx, pal, 0, f3, PANEL_H); // floor 3 down to the hinge (from floor 2)
+  consoleHousing(ctx, pal);
   chevrons(ctx, pal, PANEL_H - 5);
 }
 
