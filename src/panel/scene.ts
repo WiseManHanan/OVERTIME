@@ -117,7 +117,8 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
   if (screen === "upper" && live) {
     if (state.phase !== "title") {
       // One line across the very top-left: above Pip's tallest reach on floor 4
-      // (y ~13), and clear of the gantry (top-right).
+      // (y ~13), and clear of the gantry — its boom now runs most of the top
+      // of the screen, but stops well short of this corner (atlas.ts).
       texts.push({ text: "R" + state.round, x: 3, y: 2, cell: 6, kind: "seg14", align: "left" });
       texts.push({ text: String(state.score), x: 22, y: 2, cell: 6, kind: "seg7", align: "left" });
     }

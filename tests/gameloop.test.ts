@@ -228,8 +228,9 @@ describe("Bruno's swipe (doc §5.5)", () => {
   });
 
   it("interrupts a haul and the lever stays up", () => {
-    // Bruno paces from slot 7 up to slot 8 (the console) on the swipe tick.
-    let s = at(quietPlaying({ swipeCountdown: 2, brunoSlot: 7, brunoDir: 1 }), 4, CONSOLE_SLOT);
+    // Bruno paces from slot 6 up to his max reach (one short of the console
+    // itself) on the swipe tick — SWIPE_REACH still closes that last gap.
+    let s = at(quietPlaying({ swipeCountdown: 2, brunoSlot: BRUNO_MAX_SLOT - 1, brunoDir: 1 }), 4, CONSOLE_SLOT);
     s = step(s, "up"); // start hauling lever 0
     expect(s.pip.releasing).toBeGreaterThan(0);
     s = step(s, null); // swipe fires mid-haul
