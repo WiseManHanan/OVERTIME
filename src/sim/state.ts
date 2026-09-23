@@ -177,10 +177,13 @@ export const ROUND_CLEARED_TICKS = 18;
  *  drops Pip back to the start; all four holders out and the platform pivots off
  *  its west anchor — Bruno goes down with it (doc §5.5). */
 export const CONSOLE_SLOT = 8;
-/** Bruno starts here and paces between BRUNO_MIN_SLOT and BRUNO_MAX_SLOT. */
+/** Bruno starts here and paces between BRUNO_MIN_SLOT and BRUNO_MAX_SLOT. Stops
+ *  one short of CONSOLE_SLOT — he can never stand on the lever tile itself —
+ *  but SWIPE_REACH still closes that last gap, so the console stays a real
+ *  risk while he's pacing nearby, just not one he can plant himself on. */
 export const BRUNO_SLOT = 6;
 export const BRUNO_MIN_SLOT = 2;
-export const BRUNO_MAX_SLOT = 8;
+export const BRUNO_MAX_SLOT = CONSOLE_SLOT - 1;
 /** Ticks between Bruno's pacing steps. */
 export const BRUNO_PACE_TICKS = 2;
 /** Slots either side of Bruno his swipe reaches, matching the drawn arc. */

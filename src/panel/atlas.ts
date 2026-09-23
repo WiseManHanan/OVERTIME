@@ -436,10 +436,23 @@ function brunoThrowShapes(cx: number): Shape[] {
   ];
 }
 
+/** Where the hook — and so the four holders — hangs. Two slots left of
+ *  straight-over-the-console: with Bruno now stopping one slot short of it
+ *  (BRUNO_MAX_SLOT), there's nowhere past the console left to put the hook
+ *  that isn't cramped against the console itself or hanging off the panel
+ *  edge, so it sits back over the tail of Bruno's own beat instead — a
+ *  moving figure passing under static overhead hardware reads fine; a
+ *  console and a hook crowding each other statically did not. */
+const GANTRY_CX = slotCenterX(CONSOLE_SLOT - 2) + 12;
+
 /** Anchor x of the platform (its west pivot, bolted to the side of the screen)
- *  and its free (east) end. */
+ *  and its free (east) end — just past the last holder, not out toward the
+ *  wall. The beam only exists to be held up by the four holders (doc §5.5);
+ *  running it on past them, unsupported, to where the gantry used to sit
+ *  read as loose dead weight now that the hook (and so the holders) moved
+ *  left with Bruno's shortened beat. */
 const PLATFORM_WEST = 3;
-const PLATFORM_EAST = slotCenterX(9) + 2;
+const PLATFORM_EAST = GANTRY_CX + 8;
 
 /** A point (lx,ly) in a body-local frame rotated by `rot` and placed at (cx,cy). */
 function rot(cx: number, cy: number, lx: number, ly: number, r: number): [number, number] {
@@ -562,23 +575,22 @@ function brunoPlatformSeg(): Seg {
   };
 }
 
-/** Centred past Bruno's pacing reach (BRUNO_MAX_SLOT/CONSOLE_SLOT are both
- *  slot 8) so the gantry and its holders read as their own fixture at the
- *  platform's true east end, not just wherever Bruno happens to be standing. */
-const GANTRY_CX = slotCenterX(8) + 12;
-
-/** The overhead gantry the holders hang from — a fixed hook fixture at the
- *  platform's free (east) end. Always lit while the round is live. */
+/** The overhead gantry the holders hang from: a hook over GANTRY_CX, on a
+ *  boom that reaches the wall regardless of where that hook sits — a fixed
+ *  bracket at the panel's right edge, not a hook-relative offset, so moving
+ *  the hook never leaves the mount dangling in mid-air over open floor.
+ *  Always lit while the round is live. */
 function gantrySeg(): Seg {
   const cx = GANTRY_CX;
   const top = 3;
+  const wallX = PANEL_W - 1;
   return {
     id: "gantry",
     screen: "upper",
     shapes: [
-      rect(cx - 6, top, 24, 2.4), // the beam
-      rect(cx + 15, top, 2.4, 5), // a leg to the wall
-      poly([[cx - 4, top + 2.4], [cx - 1, top + 2.4], [cx - 2.5, top + 6]]), // a hook
+      rect(cx - 6, top, wallX - (cx - 6), 2.4), // the boom, hook end to the wall bracket
+      rect(wallX - 2.4, top, 2.4, 5), // wall bracket
+      poly([[cx - 4, top + 2.4], [cx - 1, top + 2.4], [cx - 2.5, top + 6]]), // the hook
     ],
   };
 }
