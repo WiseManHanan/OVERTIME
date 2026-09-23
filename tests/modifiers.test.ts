@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { nextFloat, seedRng } from "../src/sim/rng";
 import { MAX_SLOT, MIN_SLOT, climbSlots, type Floor } from "../src/sim/world";
-import { rollGreaseSpill, rollModifier } from "../src/sim/modifiers";
+import { MODIFIER_UNLOCK_ROUND, rollGreaseSpill, rollModifier } from "../src/sim/modifiers";
 import { CONSOLE_SLOT, initialState, type GameState } from "../src/sim/state";
 import { POINTS_PER_BOLT, POINTS_PER_ROUND_CLEAR } from "../src/sim/state";
 import { step } from "../src/sim/step";
@@ -24,9 +24,10 @@ describe("rollModifier (doc §6.3)", () => {
     const seen = new Set<string>();
     let rng = seedRng(1);
     for (let i = 0; i < 500; i++) {
-      const roll = rollModifier(rng);
+      const roll = rollModifier(rng, MODIFIER_UNLOCK_ROUND);
       rng = roll.rng;
-      seen.add(roll.modifier);
+      expect(roll.modifier).not.toBeNull(); // round is at the unlock, always draws
+      seen.add(roll.modifier!);
       if (roll.modifier === "deadColumn") {
         expect(roll.deadColumn).not.toBeNull();
         expect(roll.deadColumn!).toBeGreaterThanOrEqual(MIN_SLOT);
@@ -60,10 +61,10 @@ describe("rollModifier (doc §6.3)", () => {
     expect(seen.size).toBe(7);
   });
 
-  it("a forced modifier always wins, but deadColumn/greased still roll their slot", () => {
+  it("a forced modifier always wins, even below the unlock round, and deadColumn/greased still roll their slot", () => {
     let rng = seedRng(1);
     for (let i = 0; i < 20; i++) {
-      const roll = rollModifier(rng, "nightShift");
+      const roll = rollModifier(rng, 1, "nightShift"); // round 1 — below MODIFIER_UNLOCK_ROUND
       rng = roll.rng;
       expect(roll.modifier).toBe("nightShift");
       expect(roll.deadColumn).toBeNull();
@@ -71,7 +72,7 @@ describe("rollModifier (doc §6.3)", () => {
     }
     const slots = new Set<number>();
     for (let i = 0; i < 50; i++) {
-      const roll = rollModifier(rng, "deadColumn");
+      const roll = rollModifier(rng, 1, "deadColumn");
       rng = roll.rng;
       expect(roll.modifier).toBe("deadColumn");
       expect(roll.deadColumn).not.toBeNull();
@@ -81,7 +82,7 @@ describe("rollModifier (doc §6.3)", () => {
 
     const floors = new Set<number>();
     for (let i = 0; i < 50; i++) {
-      const roll = rollModifier(rng, "greased");
+      const roll = rollModifier(rng, 1, "greased");
       rng = roll.rng;
       expect(roll.modifier).toBe("greased");
       expect(roll.greaseFloor).not.toBeNull();
@@ -90,6 +91,22 @@ describe("rollModifier (doc §6.3)", () => {
       floors.add(roll.greaseFloor!);
     }
     expect(floors.size).toBeGreaterThan(1); // still varies, not pinned to one floor
+  });
+
+  it("no modifier before the unlock round, and the RNG stream is left untouched", () => {
+    const rng = seedRng(1);
+    const roll1 = rollModifier(rng, 1);
+    expect(roll1.modifier).toBeNull();
+    expect(roll1.deadColumn).toBeNull();
+    expect(roll1.greaseFloor).toBeNull();
+    expect(roll1.rng).toEqual(rng); // no draw — the stream doesn't move
+
+    const roll2 = rollModifier(rng, MODIFIER_UNLOCK_ROUND - 1);
+    expect(roll2.modifier).toBeNull();
+    expect(roll2.rng).toEqual(rng);
+
+    const roll3 = rollModifier(rng, MODIFIER_UNLOCK_ROUND);
+    expect(roll3.modifier).not.toBeNull(); // unlocked — draws normally
   });
 });
 
@@ -401,5 +418,26 @@ describe("forcedModifier (?modifier=, doc §6.3 playtest hook)", () => {
     expect(s.greaseFloor).not.toBe(1);
     expect(s.greaseFloor).not.toBe(4);
     expect(s.greaseSlot).not.toBeNull();
+  });
+});
+
+describe("modifier round gate (doc §6.3)", () => {
+  it("rounds 1 and 2 draw no modifier; round 3 unlocks the draw", () => {
+    let s = initialState(1, "standard", 1);
+    s = step(s, "right"); // title -> playing, round 1
+    expect(s.round).toBe(1);
+    expect(s.modifier).toBeNull();
+
+    s = { ...s, phase: "cleared", clearedCountdown: 1, bolts: [true, true, true, true] };
+    s = step(s, null); // -> round 2
+    expect(s.round).toBe(2);
+    expect(s.modifier).toBeNull();
+
+    s = { ...s, phase: "cleared", clearedCountdown: 1, bolts: [true, true, true, true] };
+    s = step(s, null); // round 2 is a grievance round (grievance.ts) — mediation first
+    expect(s.phase).toBe("mediation");
+    s = step(s, "a"); // pick the offered card -> round 3
+    expect(s.round).toBe(3);
+    expect(s.modifier).not.toBeNull(); // unlocked — draws for real now
   });
 });
