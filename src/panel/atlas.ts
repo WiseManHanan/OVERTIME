@@ -401,6 +401,41 @@ function brunoSwipeShapes(cx: number): Shape[] {
   ];
 }
 
+/** Bruno's throw windup: arms raised straight overhead, a barrel gripped
+ *  between his fists — the tell the tick before a hazard actually drops
+ *  (doc §5.4). A small staved-and-hooped barrel, the hazard's own visual
+ *  language at a scale that actually clears his hat within the panel's 96
+ *  units — his platform already rides near the top of the upper screen
+ *  (PLATFORM_Y), so there isn't headroom for a full-size `barrelShapes`
+ *  held overhead without it clipping off the top edge. */
+function brunoThrowShapes(cx: number): Shape[] {
+  const { b, base } = brunoBody(cx);
+  const armTop = b - 20;
+  const barrelCy = armTop - 2.1;
+  return [
+    ...base,
+    // squared shoulders — the fold is gone, both arms are up
+    poly([[cx - 4.6, b - 9.6], [cx + 5, b - 9.6], [cx + 4.6, b - 6.6], [cx - 4.4, b - 6.6]]),
+    // near arm, straight overhead
+    poly([[cx - 4, b - 9.2], [cx - 1.6, b - 9.6], [cx - 1.4, armTop], [cx - 3.2, armTop]]),
+    // far arm, straight overhead
+    poly([[cx + 1.4, b - 9.6], [cx + 3.6, b - 9.2], [cx + 3.4, armTop], [cx + 1.6, armTop]]),
+    rect(cx - 3.4, armTop - 1.8, 1.8, 1.8), // near fist
+    rect(cx + 1.8, armTop - 1.8, 1.8, 1.8), // far fist
+    // the barrel, gripped overhead between the fists — staved body, two hoops
+    poly([
+      [cx - 1.4, barrelCy - 1.8],
+      [cx + 1.4, barrelCy - 1.8],
+      [cx + 1.9, barrelCy],
+      [cx + 1.4, barrelCy + 1.8],
+      [cx - 1.4, barrelCy + 1.8],
+      [cx - 1.9, barrelCy],
+    ]),
+    rect(cx - 1.9, barrelCy - 1.65, 3.8, 0.5), // top hoop
+    rect(cx - 1.9, barrelCy + 1.15, 3.8, 0.5), // bottom hoop
+  ];
+}
+
 /** Anchor x of the platform (its west pivot, bolted to the side of the screen)
  *  and its free (east) end. */
 const PLATFORM_WEST = 3;
@@ -749,15 +784,19 @@ function build(): Seg[] {
   segs.push(consoleSeg(0), consoleSeg(1));
 
   // Bruno paces slots BRUNO_MIN_SLOT..BRUNO_MAX_SLOT, facing his direction of
-  // travel. Pace poses ghost; the transient swing does not (see Seg.noGhost).
+  // travel. Pace poses ghost; the transient swing and throw windup do not
+  // (see Seg.noGhost).
   for (let s = BRUNO_MIN_SLOT; s <= BRUNO_MAX_SLOT; s++) {
     const cx = slotCenterX(s);
     const paceL = brunoPaceShapes(cx, s % 2);
     const swipeL = brunoSwipeShapes(cx);
+    const throwL = brunoThrowShapes(cx);
     segs.push({ id: `bruno.pace.s${s}.l`, screen: "upper", shapes: paceL });
     segs.push({ id: `bruno.pace.s${s}.r`, screen: "upper", shapes: mirror(paceL, cx) });
     segs.push({ id: `bruno.swipe.s${s}.l`, screen: "upper", shapes: swipeL, noGhost: true });
     segs.push({ id: `bruno.swipe.s${s}.r`, screen: "upper", shapes: mirror(swipeL, cx), noGhost: true });
+    segs.push({ id: `bruno.throw.s${s}.l`, screen: "upper", shapes: throwL, noGhost: true });
+    segs.push({ id: `bruno.throw.s${s}.r`, screen: "upper", shapes: mirror(throwL, cx), noGhost: true });
   }
   for (let k = 0; k < 4; k++) {
     segs.push({

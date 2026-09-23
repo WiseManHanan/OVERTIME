@@ -95,7 +95,7 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 2)))}`);
     } else {
       const face = state.brunoDir === 1 ? "r" : "l";
-      const pose = state.swipe > 0 ? "swipe" : "pace";
+      const pose = state.swipe > 0 ? "swipe" : state.throwing > 0 ? "throw" : "pace";
       lit.add(`bruno.${pose}.s${state.brunoSlot}.${face}`);
       lit.add("bruno.platform");
       lit.add("gantry");

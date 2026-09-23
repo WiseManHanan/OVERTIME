@@ -85,6 +85,10 @@ export interface GameState {
   swipeCountdown: number;
   /** Ticks of swipe animation left (2 on the swing, then 1, 0). */
   swipe: number;
+  /** Ticks of throw-windup animation left (2 on the windup and the throw
+   *  itself, then 1, 0) — arms up, barrel in hand, one tick ahead of a
+   *  hazard actually spawning (doc §5.4). */
+  throwing: number;
   /** Ticks left on the ROUND CLEAR screen before the next round begins. */
   clearedCountdown: number;
   /** Boredom meter, 0..BOREDOM_MAX (doc §6.2). Scales every point awarded. */
@@ -249,6 +253,7 @@ export function initialState(
     spawnCountdown: first.hazardCadence,
     swipeCountdown: first.swipeCadence,
     swipe: 0,
+    throwing: 0,
     clearedCountdown: 0,
     boredom: BOREDOM_START,
     stewardAsleep: false,
