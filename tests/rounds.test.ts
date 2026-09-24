@@ -2,16 +2,22 @@ import { describe, it, expect } from "vitest";
 import { roundParams } from "../src/sim/rounds";
 
 describe("round speed table (doc §6.1)", () => {
-  it("matches the table for rounds 1–6", () => {
-    expect(roundParams(1)).toEqual({ speed: 1.0, hazardCadence: 14, swipeCadence: 9 });
-    expect(roundParams(3)).toEqual({ speed: 1.08, hazardCadence: 13, swipeCadence: 9 });
-    expect(roundParams(6)).toEqual({ speed: 1.24, hazardCadence: 11, swipeCadence: 8 });
+  it("rounds 1 and 2 are fixed, cached speeds", () => {
+    expect(roundParams(1)).toEqual({ speed: 0.65, hazardCadence: 14, swipeCadence: 9 });
+    expect(roundParams(2)).toEqual({ speed: 0.676, hazardCadence: 13, swipeCadence: 9 });
   });
 
-  it("round 7+ speeds up 4% per round, capped at 1.8", () => {
-    expect(roundParams(7).speed).toBeCloseTo(1.24 * 1.04, 5);
-    expect(roundParams(8).speed).toBeCloseTo(1.24 * 1.04 ** 2, 5);
-    expect(roundParams(100).speed).toBe(1.8);
+  it("every round past 2 compounds 7.5% over the previous round's speed, capped at 1.3", () => {
+    expect(roundParams(3).speed).toBeCloseTo(0.676 * 1.075, 6);
+    expect(roundParams(4).speed).toBeCloseTo(0.676 * 1.075 ** 2, 6);
+    expect(roundParams(6).speed).toBeCloseTo(0.676 * 1.075 ** 4, 6);
+    expect(roundParams(7).speed).toBeCloseTo(0.676 * 1.075 ** 5, 6);
+    expect(roundParams(100).speed).toBe(1.3);
+  });
+
+  it("matches the cadence table for rounds 1–6", () => {
+    expect(roundParams(3)).toMatchObject({ hazardCadence: 13, swipeCadence: 9 });
+    expect(roundParams(6)).toMatchObject({ hazardCadence: 11, swipeCadence: 8 });
   });
 
   it("round 7+ cadences ease off one tick every two rounds, down to their floors", () => {
