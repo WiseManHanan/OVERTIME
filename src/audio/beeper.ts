@@ -78,6 +78,12 @@ export function createBeeper(initialMuted: boolean): Beeper {
     gain.gain.value = 0;
     osc.connect(gain).connect(ctx.destination);
     osc.start();
+    // iOS Safari: a freshly constructed AudioContext often starts
+    // "suspended" even when construction itself happens inside a user
+    // gesture — silent forever without this, since nothing else in this
+    // first-creation path ever resumes it (only the ctx !== null branch
+    // above does, on a later call).
+    if (ctx.state === "suspended") void ctx.resume();
   }
 
   return {
