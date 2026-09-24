@@ -23,6 +23,15 @@ const STRUCTURE_ALPHA = 0.95;
 /** Sky, water tank, the skip, chevrons, the bell — scenery behind the structure. */
 const DECO_ALPHA = 0.45;
 
+/** Drop shadow under the platforms and ladders: a dark-ink duplicate of the
+ *  same silhouette, offset down-right and drawn first, so the structure reads
+ *  as sitting proud of the fainter scenery layer instead of flat against it.
+ *  Still step 2 (printed backdrop) — two passes of the same shape, no blur,
+ *  matching the flat-ink look everywhere else on the panel. */
+const SHADOW_ALPHA = 0.26;
+const SHADOW_DX = 1;
+const SHADOW_DY = 1.1;
+
 export function drawBackdrop(ctx: CanvasRenderingContext2D, screen: Screen, pal: Palette): void {
   ctx.save();
   if (screen === "upper") drawUpper(ctx, pal);
@@ -86,11 +95,22 @@ function plate(
   baselineY: number,
   gaps: ReadonlyArray<readonly [number, number]> = [],
 ): void {
+  const path = trussPath(baselineY, gaps);
+
+  ctx.save();
+  ctx.translate(SHADOW_DX, SHADOW_DY);
+  ctx.globalAlpha = SHADOW_ALPHA;
+  ctx.fillStyle = pal.segment;
+  ctx.strokeStyle = pal.segment;
+  ctx.lineWidth = 1.4;
+  ctx.fill(path);
+  ctx.stroke(path);
+  ctx.restore();
+
   ctx.globalAlpha = STRUCTURE_ALPHA;
   ctx.fillStyle = pal.printRed;
   ctx.strokeStyle = pal.printRed;
   ctx.lineWidth = 1.4;
-  const path = trussPath(baselineY, gaps);
   ctx.fill(path); // the two rails
   ctx.stroke(path); // the cross-braces (the rails' outline strokes too, invisibly — same fill colour)
 }
@@ -103,14 +123,25 @@ function ladderAtSlot(
   yA: number,
   yB: number,
 ): void {
-  ctx.globalAlpha = STRUCTURE_ALPHA;
   const x = slotCenterX(slot) - 4.5;
   const yHigh = Math.min(yA, yB);
   const yLow = Math.max(yA, yB);
+  const rails = (): void => {
+    ctx.fillRect(x, yHigh, 2.6, yLow - yHigh);
+    ctx.fillRect(x + 6.9, yHigh, 2.6, yLow - yHigh);
+    for (let y = yHigh + 3; y < yLow; y += 5) ctx.fillRect(x, y, 9.5, 2);
+  };
+
+  ctx.save();
+  ctx.translate(SHADOW_DX, SHADOW_DY);
+  ctx.globalAlpha = SHADOW_ALPHA;
+  ctx.fillStyle = pal.segment;
+  rails();
+  ctx.restore();
+
+  ctx.globalAlpha = STRUCTURE_ALPHA;
   ctx.fillStyle = pal.printYellow;
-  ctx.fillRect(x, yHigh, 2.6, yLow - yHigh);
-  ctx.fillRect(x + 6.9, yHigh, 2.6, yLow - yHigh);
-  for (let y = yHigh + 3; y < yLow; y += 5) ctx.fillRect(x, y, 9.5, 2);
+  rails();
 }
 
 /** The lever console's housing: body and readout strip, printed and fixed —

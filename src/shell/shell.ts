@@ -29,14 +29,25 @@ const TEMPLATE = `
   <div class="status-strip" role="status" aria-live="polite">STANDARD</div>
 
   <div class="deck">
-    <div class="dpad" role="group" aria-label="Direction pad">
-      <button class="pad pad-up" type="button" aria-label="Up"></button>
-      <button class="pad pad-left" type="button" aria-label="Left"></button>
-      <span class="pad-hub" aria-hidden="true"></span>
-      <button class="pad pad-right" type="button" aria-label="Right"></button>
-      <button class="pad pad-down" type="button" aria-label="Down"></button>
-    </div>
-    <button class="btn-a" type="button" aria-label="A button">A</button>
+    <span class="dpad-socket">
+      <span class="dpad-recess" aria-hidden="true">
+        <i class="recess-up"></i>
+        <i class="recess-left"></i>
+        <i class="recess-hub"></i>
+        <i class="recess-right"></i>
+        <i class="recess-down"></i>
+      </span>
+      <div class="dpad" role="group" aria-label="Direction pad">
+        <button class="pad pad-up" type="button" aria-label="Up"></button>
+        <button class="pad pad-left" type="button" aria-label="Left"></button>
+        <span class="pad-hub" aria-hidden="true"></span>
+        <button class="pad pad-right" type="button" aria-label="Right"></button>
+        <button class="pad pad-down" type="button" aria-label="Down"></button>
+      </div>
+    </span>
+    <span class="a-socket">
+      <button class="btn-a" type="button" aria-label="A button">A</button>
+    </span>
   </div>
 
   <div class="mode-row" role="group" aria-label="Mode">
