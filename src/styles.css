@@ -156,7 +156,7 @@ body {
 
 .dpad {
   display: grid;
-  grid-template: repeat(3, 26px) / repeat(3, 26px);
+  grid-template: repeat(3, var(--dpad-cell)) / repeat(3, var(--dpad-cell));
 }
 
 .pad,
@@ -271,11 +271,20 @@ body {
    the hub): every piece here reuses that exact radius pattern, and the
    dark-top/light-bottom bevel is only ever placed on a piece's true outer
    edge, never on a seam between two recess pieces (which would fake a ridge
-   where the floor is meant to read as one continuous depression). */
+   where the floor is meant to read as one continuous depression).
+   Every position/size below is `calc()`'d from these two custom properties
+   rather than the 26/29/32/52/etc. pixel literals a straight port of the
+   old clip-path math would have used: change `--dpad-cell` (it also drives
+   .dpad's own grid-template, since these properties inherit down to it) or
+   `--dpad-margin` here and every recess piece — and the grid it sits under
+   — moves together, instead of ten independent numbers that could quietly
+   drift apart from .dpad's actual geometry. */
 .dpad-socket {
+  --dpad-cell: 26px;
+  --dpad-margin: 3px;
   position: relative;
-  width: 78px;
-  height: 78px;
+  width: calc(var(--dpad-cell) * 3);
+  height: calc(var(--dpad-cell) * 3);
 }
 
 .dpad-recess i {
@@ -284,46 +293,46 @@ body {
 }
 
 .recess-up {
-  top: -3px;
-  left: 23px;
-  width: 32px;
-  height: 29px;
+  top: calc(-1 * var(--dpad-margin));
+  left: calc(var(--dpad-cell) - var(--dpad-margin));
+  width: calc(var(--dpad-cell) + 2 * var(--dpad-margin));
+  height: calc(var(--dpad-cell) + var(--dpad-margin));
   border-radius: 5px 5px 0 0;
   box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3);
 }
 .recess-down {
-  top: 52px;
-  left: 23px;
-  width: 32px;
-  height: 29px;
+  top: calc(var(--dpad-cell) * 2);
+  left: calc(var(--dpad-cell) - var(--dpad-margin));
+  width: calc(var(--dpad-cell) + 2 * var(--dpad-margin));
+  height: calc(var(--dpad-cell) + var(--dpad-margin));
   border-radius: 0 0 5px 5px;
   box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.18);
 }
 .recess-left {
-  top: 23px;
-  left: -3px;
-  width: 29px;
-  height: 32px;
+  top: calc(var(--dpad-cell) - var(--dpad-margin));
+  left: calc(-1 * var(--dpad-margin));
+  width: calc(var(--dpad-cell) + var(--dpad-margin));
+  height: calc(var(--dpad-cell) + 2 * var(--dpad-margin));
   border-radius: 5px 0 0 5px;
   box-shadow:
     inset 0 2px 3px rgba(0, 0, 0, 0.3),
     inset 0 -1px 1px rgba(255, 255, 255, 0.18);
 }
 .recess-right {
-  top: 23px;
-  left: 52px;
-  width: 29px;
-  height: 32px;
+  top: calc(var(--dpad-cell) - var(--dpad-margin));
+  left: calc(var(--dpad-cell) * 2);
+  width: calc(var(--dpad-cell) + var(--dpad-margin));
+  height: calc(var(--dpad-cell) + 2 * var(--dpad-margin));
   border-radius: 0 5px 5px 0;
   box-shadow:
     inset 0 2px 3px rgba(0, 0, 0, 0.3),
     inset 0 -1px 1px rgba(255, 255, 255, 0.18);
 }
 .recess-hub {
-  top: 26px;
-  left: 26px;
-  width: 26px;
-  height: 26px;
+  top: var(--dpad-cell);
+  left: var(--dpad-cell);
+  width: var(--dpad-cell);
+  height: var(--dpad-cell);
 }
 
 .btn-a {
