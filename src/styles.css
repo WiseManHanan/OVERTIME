@@ -155,6 +155,16 @@ body {
 }
 
 .dpad {
+  /* Without `position`, .dpad's grid-item buttons paint like inline-blocks
+     (CSS Grid §5: a grid item only gets stacking-context/z-index:0-auto
+     treatment from an explicit z-index — plain position:static ones don't),
+     a painting tier BELOW .dpad-recess's `position: absolute` pieces. That
+     silently put the recess on top and ate every click. `position: relative`
+     (z-index still auto, so no new stacking context, no visual change)
+     promotes the whole .dpad box — and everything painted inside it — to
+     the same tier as the recess, ordered after it by DOM position, which is
+     what actually puts the buttons back on top. */
+  position: relative;
   display: grid;
   grid-template: repeat(3, var(--dpad-cell)) / repeat(3, var(--dpad-cell));
 }
@@ -210,6 +220,31 @@ body {
   /* The raised bevel and outer drop shadow both go away on press — inset
      only, same "pushed into the shell" treatment btn-a gets. */
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Press-tilt: pressing one arm rocks the whole cross around the hub, like a
+   seesaw, instead of just nudging that one arm down — the pressed side dips
+   back into its socket while the opposite tip lifts slightly toward the
+   viewer. `:has()` reads which arm is `:active` and tilts .dpad as a single
+   rigid plane against the `perspective` on its socket; transform-origin is
+   left at the default 50% 50%, which is already the hub's own centre since
+   .dpad is exactly 3 cells square. No transition — every other press state
+   here (.pad:active, .btn-a:active) snaps instantly, matching the discrete,
+   no-easing feel the sim's own render loop keeps to (doc invariant 5). */
+.dpad-socket {
+  perspective: 140px;
+}
+.dpad:has(.pad-up:active) {
+  transform: rotateX(10deg);
+}
+.dpad:has(.pad-down:active) {
+  transform: rotateX(-10deg);
+}
+.dpad:has(.pad-left:active) {
+  transform: rotateY(-10deg);
+}
+.dpad:has(.pad-right:active) {
+  transform: rotateY(10deg);
 }
 
 /* Title-state onboarding: LEFT/RIGHT blink until the first move (doc §9.3). */
