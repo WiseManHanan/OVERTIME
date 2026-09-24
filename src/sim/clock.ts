@@ -71,3 +71,27 @@ const PARAMS: Record<ClockMode, ClockParams> = {
 export function clockParams(mode: ClockMode): ClockParams {
   return PARAMS[mode];
 }
+
+/** Type guard for `?clock=` (main.ts) — any other string is ignored. Derived
+ *  from PARAMS's own keys rather than a hand-maintained list, so a mode
+ *  added to the `ClockMode` union and PARAMS (TS requires both — PARAMS is
+ *  a `Record<ClockMode, ClockParams>`) can't be missed here too. */
+const CLOCK_MODES = Object.keys(PARAMS) as ClockMode[];
+
+export function isClockMode(x: string): x is ClockMode {
+  return (CLOCK_MODES as readonly string[]).includes(x);
+}
+
+/** Resolves whether Bruno is actually active this tick (doc §7.1) — off
+ *  during LUNCH's or pre-wake NIGHT's away window, or LONGER BREAKS' added
+ *  pause. The one formula stepPlaying and a fresh round's reset both call,
+ *  so state.brunoHere and the renderer that reads it can't drift out of
+ *  sync with each other. */
+export function resolveBrunoHere(
+  roundTick: number,
+  cp: ClockParams,
+  brunoPauseTicks: number,
+  nightAwake: boolean,
+): boolean {
+  return roundTick >= cp.brunoAwayUntil + brunoPauseTicks || nightAwake;
+}

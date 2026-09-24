@@ -79,6 +79,17 @@ export interface GameState {
   brunoSlot: number;
   /** Which way Bruno is pacing; flips at the ends of his beat. */
   brunoDir: -1 | 1;
+  /** Whether Bruno is actually active this tick — off during LUNCH's or
+   *  pre-wake NIGHT's away window (doc §7.1), or LONGER BREAKS' added pause.
+   *  Resolved once by stepPlaying and carried on state rather than
+   *  recomputed by the renderer: scene.ts reads this directly instead of
+   *  re-deriving it from tick/playingSince/clock, which drifted a tick out
+   *  of sync with stepPlaying's own value (stepPlaying computes it from the
+   *  tick *before* this step's `tick: state.tick + 1` increment — a second
+   *  copy of the formula reading the post-increment tick was one tick
+   *  ahead). Phases other than "playing" just carry the last resolved value
+   *  forward unchanged. */
+  brunoHere: boolean;
   /** Ticks until the next hazard spawns. */
   spawnCountdown: number;
   /** Ticks until Bruno's next swipe. */
@@ -184,6 +195,13 @@ export const CONSOLE_SLOT = 8;
 export const BRUNO_SLOT = 6;
 export const BRUNO_MIN_SLOT = 2;
 export const BRUNO_MAX_SLOT = CONSOLE_SLOT - 1;
+/** Where he's drawn while off (doc §7.1: LUNCH, or NIGHT before he wakes) —
+ *  the middle of his pacing range, clear of both the west anchor and the
+ *  gantry/holder chains at the east end, rather than wherever `brunoSlot`
+ *  happened to be frozen when he stepped away. Render-only (scene.ts): the
+ *  sim's own `brunoSlot` is untouched, so pacing picks back up from the same
+ *  place once he's here again. */
+export const BRUNO_OFF_SLOT = Math.round((BRUNO_MIN_SLOT + BRUNO_MAX_SLOT) / 2);
 /** Ticks between Bruno's pacing steps. */
 export const BRUNO_PACE_TICKS = 2;
 /** Slots either side of Bruno his swipe reaches, matching the drawn arc. */
@@ -253,6 +271,10 @@ export function initialState(
     boltProgress: BOLT_SLOTS.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
+    // Recomputed fresh every "playing" tick (stepPlaying) — this only covers
+    // the title screen's preview, where he should just read as normally on
+    // the job.
+    brunoHere: true,
     spawnCountdown: first.hazardCadence,
     swipeCountdown: first.swipeCadence,
     swipe: 0,

@@ -4,7 +4,12 @@
  * ids and on-panel text, nothing more.
  */
 import type { GameState } from "../sim/state";
-import { GLITCH_TICKS, HIT_BLINK_HALF_PERIOD, ROUND_CLEARED_TICKS } from "../sim/state";
+import {
+  BRUNO_OFF_SLOT,
+  GLITCH_TICKS,
+  HIT_BLINK_HALF_PERIOD,
+  ROUND_CLEARED_TICKS,
+} from "../sim/state";
 import { sameCell } from "../sim/battery";
 import { BOLT_SLOTS, floorScreen, isStandable } from "../sim/world";
 import { BOREDOM_MAX, stewardMood } from "../sim/scoring";
@@ -25,6 +30,12 @@ const TITLE_TEXTS: readonly TextSpec[] = [
   { text: "OVERTIME", x: PANEL_W / 2, y: 7, cell: 13, kind: "seg14", align: "center" },
   { text: "MOVE TO START", x: PANEL_W / 2, y: 29, cell: 7, kind: "seg14", align: "center" },
 ];
+
+/** Ticks each frame of Bruno's off-duty Z's holds before the discrete jump
+ *  to the next (doc invariant 5 — a tick-keyed toggle, not a tween). At the
+ *  base 250ms tick (main.ts), 6 ticks is a 1.5s pulse — brisk enough to read
+ *  as breathing, not a slow drift. */
+const BRUNO_Z_PHASE_TICKS = 6;
 
 export function sceneFor(state: GameState, screen: Screen): Scene {
   const lit = new Set<string>();
@@ -94,9 +105,24 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       const elapsed = ROUND_CLEARED_TICKS - state.clearedCountdown;
       lit.add(`bruno.fall.f${Math.max(0, Math.min(3, Math.floor(elapsed / 2)))}`);
     } else {
+      // Off-duty (doc §7.1): state.brunoHere is resolved once by step.ts
+      // (stepPlaying, or a fresh round's reset), not re-derived here —
+      // recomputing it from tick/playingSince/clock read one tick ahead of
+      // what step.ts used to pick this frame's brunoSlot/swipe/throwing, a
+      // real desync on every away-to-here transition. While off, he's drawn
+      // at BRUNO_OFF_SLOT instead of his own frozen `brunoSlot` — clear of
+      // the west anchor and the gantry/holder chains, rather than wherever
+      // pacing happened to leave him (often right at BRUNO_SLOT, under the
+      // chains) — with the Z's ticking through their two frames alongside.
+      const brunoHere = state.brunoHere;
       const face = state.brunoDir === 1 ? "r" : "l";
       const pose = state.swipe > 0 ? "swipe" : state.throwing > 0 ? "throw" : "pace";
-      lit.add(`bruno.${pose}.s${state.brunoSlot}.${face}`);
+      const slot = brunoHere ? state.brunoSlot : BRUNO_OFF_SLOT;
+      lit.add(`bruno.${pose}.s${slot}.${face}`);
+      if (!brunoHere) {
+        const phase = Math.floor(state.tick / BRUNO_Z_PHASE_TICKS) % 2;
+        lit.add(`bruno.z.f${phase}`);
+      }
       lit.add("bruno.platform");
       lit.add("gantry");
       // Each holder stands until Pip pulls its lever at the console.
@@ -191,7 +217,7 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       texts.push({ text: "GAME OVER", x: PANEL_W / 2, y: 12, cell: 11, kind: "seg14", align: "center" });
       texts.push({ text: "SCORE", x: PANEL_W / 2, y: 34, cell: 6, kind: "seg14", align: "center" });
       texts.push({ text: String(state.score), x: PANEL_W / 2, y: 44, cell: 14, kind: "seg7", align: "center" });
-      texts.push({ text: "PRESS A", x: PANEL_W / 2, y: 68, cell: 7, kind: "seg14", align: "center" });
+      texts.push({ text: "PRESS JUMP", x: PANEL_W / 2, y: 68, cell: 7, kind: "seg14", align: "center" });
     } else if (state.phase === "mediation") {
       // The Steward presents up to three concession cards; LEFT/RIGHT cycles
       // the highlight (the bigger cell), A picks it (doc §7.2).
@@ -212,12 +238,12 @@ export function sceneFor(state: GameState, screen: Screen): Scene {
       const chosen = state.mediationCards[state.mediationSelected];
       const card = chosen ? CARD_BY_ID.get(chosen) : undefined;
       if (card) {
-        // Cell 7 — the same size as GAME OVER's "PRESS A" — so the trade-off
+        // Cell 7 — the same size as GAME OVER's "PRESS JUMP" — so the trade-off
         // itself reads at a glance, not just the card's name above it.
         texts.push({ text: card.youGain, x: 6, y: 58, cell: 7, kind: "seg14", align: "left" });
         texts.push({ text: card.brunoGains, x: 6, y: 71, cell: 7, kind: "seg14", align: "left" });
       }
-      texts.push({ text: "LEFT RIGHT A", x: PANEL_W / 2, y: 86, cell: 5, kind: "seg14", align: "center" });
+      texts.push({ text: "LEFT RIGHT JUMP", x: PANEL_W / 2, y: 86, cell: 5, kind: "seg14", align: "center" });
     }
   }
 

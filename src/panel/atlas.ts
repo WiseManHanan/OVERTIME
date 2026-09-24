@@ -22,6 +22,7 @@ import {
 import {
   BRUNO_MAX_SLOT,
   BRUNO_MIN_SLOT,
+  BRUNO_OFF_SLOT,
   BRUNO_SLOT,
   CONSOLE_SLOT,
   SWIPE_REACH,
@@ -30,6 +31,30 @@ import {
 
 const rect = (x: number, y: number, w: number, h: number): Shape => ({ k: "rect", x, y, w, h });
 const poly = (pts: [number, number][]): Shape => ({ k: "poly", pts });
+
+/** A single chunky "Z", `s` units tall, centred on `(cx, cy)` — the sleep/
+ *  off-duty cue shared by the Steward (asleep) and Bruno (away, doc §7.1:
+ *  LUNCH and pre-wake NIGHT both leave him idle with nothing else marking
+ *  it). One stroke-width-1 outline traced as a single closed poly: top bar,
+ *  diagonal, bottom bar, back up the parallel diagonal. */
+function zMark(cx: number, cy: number, s: number): Shape {
+  const w = s * 0.85;
+  const t = s * 0.22;
+  const x0 = cx - w / 2;
+  const y0 = cy - s / 2;
+  return poly([
+    [x0, y0],
+    [x0 + w, y0],
+    [x0 + w, y0 + t],
+    [x0 + t, y0 + s - t],
+    [x0 + w, y0 + s - t],
+    [x0 + w, y0 + s],
+    [x0, y0 + s],
+    [x0, y0 + s - t],
+    [x0 + w - t, y0 + t],
+    [x0, y0 + t],
+  ]);
+}
 
 /*
  * Pip: an original blocky site worker in right-facing profile — a hard hat with
@@ -351,6 +376,26 @@ function brunoBody(cx: number): { cx: number; b: number; base: Shape[] } {
       poly([[cx + 1.6, b - 3.4], [cx + 5.4, b - 3.4], [cx + 6, b], [cx + 1, b]]),
     ],
   };
+}
+
+/** The "off duty" cue (doc §7.1): LUNCH and pre-wake NIGHT both leave Bruno
+ *  idle at his frozen pace pose with nothing else distinguishing it from him
+ *  standing alert. Always drawn at BRUNO_OFF_SLOT (scene.ts renders him
+ *  there too, whenever he's off) rather than following his own frozen
+ *  `brunoSlot` — the east end of his beat sits right under the gantry boom
+ *  (y 3–5.4), which would otherwise swallow marks placed above his hat
+ *  (crown at b-21.4, almost no headroom below the panel's own top edge).
+ *  Two discrete frames, not a tween (doc invariant 5): the cluster steps
+ *  outward and grows between them, cycled on a tick timer in scene.ts — the
+ *  same one-frame-to-the-next jump Pip's own walk cycle uses. */
+function brunoZShapes(phase: 0 | 1): Shape[] {
+  const cx = slotCenterX(BRUNO_OFF_SLOT);
+  const b = PLATFORM_Y;
+  const grow = phase === 0 ? 0 : 1;
+  return [
+    zMark(cx + 5.5 + grow, b - 20 - grow, 1.6 + grow * 0.5),
+    zMark(cx + 8.5 + grow, b - 21.5 - grow, 2.4 + grow * 0.5),
+  ];
 }
 
 /** Bruno pacing his beat, arms folded, with a slight bob keyed off `roll`. */
@@ -699,8 +744,8 @@ function stewardShapes(mood: "idle" | "bell" | "watch" | "asleep"): Shape[] {
       poly([[cx - 1.8, b - 12], [cx + 2.4, b - 11.4], [cx + 1.8, b - 8.4], [cx - 2.2, b - 9]]), // head lolled forward
       poly([[cx - 3, b - 9], [cx + 3.4, b - 9.6], [cx + 3, b - 2], [cx - 2.6, b - 2]]), // slumped coat
       rect(cx - 2.6, b - 2, 5.4, 2), // sat down on the job
-      poly([[cx + 3, b - 17], [cx + 5.6, b - 16.4], [cx + 5.4, b - 15.4], [cx + 2.8, b - 16]]), // sleep marks
-      poly([[cx + 3.4, b - 14.8], [cx + 5.2, b - 14.3], [cx + 5, b - 13.5], [cx + 3.2, b - 14]]),
+      zMark(cx + 3.8, b - 14, 1.8), // "zZ" trailing up and away from the head
+      zMark(cx + 5.6, b - 17.6, 2.6),
     ];
   }
   const base: Shape[] = [
@@ -808,6 +853,10 @@ function build(): Seg[] {
     segs.push({ id: `bruno.throw.s${s}.l`, screen: "upper", shapes: throwL, noGhost: true });
     segs.push({ id: `bruno.throw.s${s}.r`, screen: "upper", shapes: mirror(throwL, cx), noGhost: true });
   }
+  // Off-duty Z's: one fixed spot (BRUNO_OFF_SLOT), two frames — see
+  // brunoZShapes above.
+  segs.push({ id: "bruno.z.f0", screen: "upper", shapes: brunoZShapes(0) });
+  segs.push({ id: "bruno.z.f1", screen: "upper", shapes: brunoZShapes(1) });
   for (let k = 0; k < 4; k++) {
     segs.push({
       id: `bruno.fall.f${k}`,

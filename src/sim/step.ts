@@ -49,6 +49,7 @@ import {
   NIGHT_NOISE_MAX,
   clockParams,
   effectiveRound,
+  resolveBrunoHere,
 } from "./clock";
 import { batteryDead, hasStuckSegment, nextBattery, pickStuckPose } from "./battery";
 import {
@@ -344,7 +345,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
   // see below), then he's here at a round's worth of extra difficulty. Longer
   // Breaks adds its own pause on top, whatever the clock mode.
   const nightAwake = state.clock === "night" && state.nightWoken;
-  const brunoHere = roundTick >= cp.brunoAwayUntil + effects.brunoPauseTicks || nightAwake;
+  const brunoHere = resolveBrunoHere(roundTick, cp, effects.brunoPauseTicks, nightAwake);
   const effRound = effectiveRound(state.round, state.clock, state.nightWoken);
   const params = roundParams(effRound);
   // CAFFEINATED (doc §6.3): Bruno swipes twice as often; hazard cadence is
@@ -654,6 +655,7 @@ function stepPlaying(state: GameState, input: InputAction | null): GameState {
     boltProgress,
     brunoSlot,
     brunoDir,
+    brunoHere,
     spawnCountdown,
     throwing,
     swipeCountdown,
@@ -772,6 +774,14 @@ function beginNextRound(state: GameState): GameState {
   const roll = rollModifier(rng, round, state.forcedModifier);
   rng = roll.rng;
 
+  // roundTick is 0 here (playingSince is set to this same returned tick,
+  // below) and nightWoken resets to false with it — resolveBrunoHere still
+  // called explicitly, not left to stepPlaying's next tick, so the very
+  // first frame of the new round doesn't render one tick stale (the same
+  // bug this shared function was factored out to fix — see state.ts's
+  // brunoHere doc).
+  const brunoHere = resolveBrunoHere(0, clockParams(state.clock), effectsFor(state.concessions).brunoPauseTicks, false);
+
   return {
     ...state,
     tick: state.tick + 1,
@@ -788,6 +798,7 @@ function beginNextRound(state: GameState): GameState {
     boltProgress: state.boltProgress.map(() => 0),
     brunoSlot: BRUNO_SLOT,
     brunoDir: 1,
+    brunoHere,
     spawnCountdown: params.hazardCadence,
     swipeCountdown: swipeCadenceFor(roll.modifier, params.swipeCadence),
     swipe: 0,
