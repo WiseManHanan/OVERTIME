@@ -26,7 +26,7 @@ const TEMPLATE = `
     </ul>
     <p class="info-console">
       The lever panel is on floor 4, at the far right past Bruno. Stand on it
-      and hold <strong>▲</strong> &mdash; each haul takes three ticks, and you
+      and hold <strong>▲</strong> &mdash; each haul takes two ticks, and you
       can't move while it releases. Pull it four times to drop all four
       holders and clear the round, but linger too long and his swipe can
       knock it back up.

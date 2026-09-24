@@ -170,7 +170,7 @@ export interface GameState {
 export const START_FLOOR: Floor = 1;
 export const START_SLOT = 5;
 export const MISSES_ALLOWED = 3;
-export const BOLT_RELEASE_TICKS = 3;
+export const BOLT_RELEASE_TICKS = 2;
 export const ROUND_CLEARED_TICKS = 18;
 /** The one control console, on the floor-4 deck at the east end by the holders
  *  and the climb-up ladder. Hauling a lever pulls a holder, sweeps the stage and

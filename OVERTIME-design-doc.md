@@ -230,7 +230,7 @@ Hazard type is unlocked by round: barrels from round 1, coffee cups from 2, chai
 
 ### 5.5 Bolts and round clear
 
-Standing on a bolt station and pressing UP begins a 3-tick release animation during which Pip cannot move. Bruno swipes at floor 4 on a fixed cadence (every 9 ticks at round 1, decreasing); being swiped costs a miss and resets that bolt.
+Standing on a bolt station and pressing UP begins a 2-tick release animation during which Pip cannot move. Bruno swipes at floor 4 on a fixed cadence (every 9 ticks at round 1, decreasing); being swiped costs a miss and resets that bolt.
 
 All four bolts released → Bruno's platform drops → round clear.
 
