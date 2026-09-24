@@ -642,4 +642,12 @@ body {
   #page-links {
     padding: 10px 0 16px;
   }
+  /* The d-pad's hit area is just its three 26px grid cells (doc invariant:
+     no game control bigger than it visually needs to be on desktop) — fine
+     with a mouse, cramped for a fingertip. +19% here (26px -> 31px) grows
+     the grid, the recess under it, and every .pad button's own touch target
+     together, since all three already read off this one custom property. */
+  .dpad-socket {
+    --dpad-cell: 31px;
+  }
 }
