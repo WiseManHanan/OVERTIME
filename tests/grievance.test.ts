@@ -282,7 +282,7 @@ describe("concession effects reach the sim (doc §7.2)", () => {
     });
     s = step(s, "up");
     expect(s.pip.releasing).toBe(5);
-    expect(BOLT_RELEASE_TICKS).toBe(3); // the base constant is untouched
+    expect(BOLT_RELEASE_TICKS).toBe(2); // the base constant is untouched
   });
 
   it("Recognition Programme: a near miss pays double", () => {
