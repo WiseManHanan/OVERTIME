@@ -16,7 +16,7 @@ import { sceneFor } from "./panel/scene";
 import { initialState, type GameState } from "./sim/state";
 import { step } from "./sim/step";
 import { roundParams } from "./sim/rounds";
-import { clockParams, effectiveRound, resolveClock } from "./sim/clock";
+import { clockParams, effectiveRound, isClockMode, resolveClock, type ClockMode } from "./sim/clock";
 import { batteryContrast, batteryDetune, isBlackoutTick } from "./sim/battery";
 import { effectsFor } from "./sim/grievance";
 import { stewardMood } from "./sim/scoring";
@@ -118,12 +118,21 @@ function debugModifier(): Modifier | null {
   return raw !== null && isModifier(raw) ? raw : null;
 }
 
+// Cheat: ?clock=lunch forces that clock mode instead of resolving it from the
+// wall clock (doc §7.1) — playtesting LUNCH's or NIGHT's away-Bruno window
+// (or any other mode's tuning) without waiting for the real hour to match.
+// An unrecognized or missing value falls back to the real clock.
+function debugClock(): ClockMode | null {
+  const raw = new URLSearchParams(window.location.search).get("clock");
+  return raw !== null && isClockMode(raw) ? raw : null;
+}
+
 // A run starts with the wall clock read once (doc §7.1) — resolved here, never
 // inside step().
 function freshRun(): GameState {
   return initialState(
     Date.now() >>> 0,
-    resolveClock(new Date()),
+    debugClock() ?? resolveClock(new Date()),
     debugStartRound(),
     debugModifier(),
   );
