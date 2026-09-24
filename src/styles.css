@@ -149,9 +149,27 @@ body {
 
 .deck {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 4px 4px 0;
+}
+
+.deck-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Printed caption under each control (doc §3.1: printed colour is
+   decoration, matching the silkscreen mark's own small-caps treatment) —
+   not the button's own name, but what it does, the way the reference
+   hardware labels a control by its game function rather than "A"/"1". */
+.deck-label {
+  font: 700 9px/1 var(--font-silk);
+  letter-spacing: 0.16em;
+  color: #4c5147;
+  white-space: nowrap;
 }
 
 .dpad {
@@ -375,9 +393,6 @@ body {
   height: 57px;
   border-radius: 50%;
   background: radial-gradient(circle at 38% 34%, #d1584c, #a23b32);
-  color: #fdeee9;
-  font: 700 15px/1 var(--font-silk);
-  letter-spacing: 0.06em;
   /* Same fuller bevel as .pad — light top inset plus a dark bottom inset edge,
      not just the one highlight — so the cap reads as domed, not flat with a
      shine painted on. */
