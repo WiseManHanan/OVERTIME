@@ -238,25 +238,23 @@ const POSE_SHAPES: Record<PipPose, (cx: number, b: number, s?: number) => Shape[
   release: releaseShapes,
 };
 
-/** A rolling barrel: a low hazard on the floor line, ~5 tall. Bulging staves,
- *  two iron hoops, a visible end-cap; `roll` (0/1) shifts the hoops so a row of
- *  them reads as tumbling (doc §5.4). */
+/** A rolling barrel: a low hazard on the floor line, ~6.6 across. Two
+ *  earlier tries both failed against a real in-game screenshot: separate
+ *  hoop rects anti-aliased into an indistinct blob, and a pinched hexagonal
+ *  outline (still trying to fake roundness with straight edges) read as
+ *  anything but round. The actual reference — classic barrel-roll sprites —
+ *  are a plain circle with one rotating crescent cut out of it, nothing
+ *  else; that crescent is the whole read; `w` is what makes an `arc` a
+ *  literal hole here rather than another solid mark (see paths.ts). `roll`
+ *  (0/1) spins the crescent about a third of a turn, so adjacent ghost
+ *  slots don't look like one sprite stamped twice (doc §5.4). */
 function barrelShapes(cx: number, b: number, roll = 0): Shape[] {
-  const cy = b - 3.4;
-  const hoopDx = roll === 0 ? -0.5 : 0.5;
+  const cy = b - 3.3;
+  const r = 3.3;
+  const start = roll === 0 ? 0.3 : 0.3 + (Math.PI * 2) / 3;
   return [
-    poly([ // barrel body, staved — wider at the belly
-      [cx - 2.4, b - 6.4],
-      [cx + 2.4, b - 6.4],
-      [cx + 3.4, cy],
-      [cx + 2.4, b - 0.4],
-      [cx - 2.4, b - 0.4],
-      [cx - 3.4, cy],
-    ]),
-    { k: "circle", cx: cx + 2.2, cy, r: 1.5 }, // near end-cap
-    rect(cx - 3.5 + hoopDx, b - 5.4, 7, 0.9), // top hoop
-    rect(cx - 3.7 + hoopDx, b - 1.9, 7.4, 0.9), // bottom hoop
-    rect(cx - 3.2 - hoopDx, cy - 0.5, 6.4, 0.9), // belly hoop, counter-shifted
+    { k: "circle", cx, cy, r },
+    { k: "arc", cx, cy, r: 2.1, a0: start, a1: start + Math.PI * 1.3, w: 2.2 },
   ];
 }
 
