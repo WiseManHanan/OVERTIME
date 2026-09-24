@@ -227,17 +227,120 @@ body {
   }
 }
 
+/* The socket a control sits in: a shallow recess molded into the shell, a
+   few px larger than the control all round, so it reads as seated in a hole
+   rather than glued flat to the surface. A real element (like .pad-hub),
+   not a ::before on the control itself — a negative-z-index pseudo there
+   paints above the control's own background within its stacking context,
+   not behind it, hiding it entirely.
+   Neither socket is a game control — .a-socket is the ring of shell visible
+   around the cap, .dpad-recess the hole the cross sits in — so both get
+   touch-action:none too: without it, a touch landing on that rim (outside
+   the real <button>s, which are the only elements input.ts binds to) falls
+   through to the browser as a scroll/pan gesture instead of doing nothing. */
+.a-socket,
+.dpad-socket {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.a-socket {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 63px;
+  height: 63px;
+  border-radius: 50%;
+  background: var(--shell-shadow);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.18);
+}
+
+/* The d-pad's recess, unlike the round .a-socket, can't be one element: a
+   `clip-path` cross would also clip .pad's own drop-shadow and its
+   :focus-visible outline to the same silhouette (they belong to .dpad, a
+   descendant), and a plain `box-shadow: inset` only reaches a few px from
+   the element's rectangular edges — nowhere near the 26px-deep inner
+   corners where two arms meet, leaving most of a one-piece recess unshaded.
+   So instead this is five small pieces — one behind each arm, one behind
+   the hub — positioned exactly like .pad-up/.pad-left/.pad-hub/etc, each
+   3px bigger than its arm on every outward-facing edge and flush (0 extra)
+   on the edges that border another piece. Same trick .pad-up itself already
+   uses (`border-radius: 5px 5px 0 0`, rounded only where it doesn't touch
+   the hub): every piece here reuses that exact radius pattern, and the
+   dark-top/light-bottom bevel is only ever placed on a piece's true outer
+   edge, never on a seam between two recess pieces (which would fake a ridge
+   where the floor is meant to read as one continuous depression). */
+.dpad-socket {
+  position: relative;
+  width: 78px;
+  height: 78px;
+}
+
+.dpad-recess i {
+  position: absolute;
+  background: var(--shell-shadow);
+}
+
+.recess-up {
+  top: -3px;
+  left: 23px;
+  width: 32px;
+  height: 29px;
+  border-radius: 5px 5px 0 0;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+.recess-down {
+  top: 52px;
+  left: 23px;
+  width: 32px;
+  height: 29px;
+  border-radius: 0 0 5px 5px;
+  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.18);
+}
+.recess-left {
+  top: 23px;
+  left: -3px;
+  width: 29px;
+  height: 32px;
+  border-radius: 5px 0 0 5px;
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.18);
+}
+.recess-right {
+  top: 23px;
+  left: 52px;
+  width: 29px;
+  height: 32px;
+  border-radius: 0 5px 5px 0;
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.18);
+}
+.recess-hub {
+  top: 26px;
+  left: 26px;
+  width: 26px;
+  height: 26px;
+}
+
 .btn-a {
-  width: 52px;
-  height: 52px;
+  width: 57px;
+  height: 57px;
   border-radius: 50%;
   background: radial-gradient(circle at 38% 34%, #d1584c, #a23b32);
   color: #fdeee9;
   font: 700 15px/1 var(--font-silk);
   letter-spacing: 0.06em;
+  /* Same fuller bevel as .pad — light top inset plus a dark bottom inset edge,
+     not just the one highlight — so the cap reads as domed, not flat with a
+     shine painted on. */
   box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.4),
-    0 3px 6px rgba(0, 0, 0, 0.35);
+    inset 0 3px 4px rgba(255, 255, 255, 0.45),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.3),
+    0 4px 7px rgba(0, 0, 0, 0.4);
 }
 
 .btn-a:active {
