@@ -665,4 +665,46 @@ body {
   .dpad-socket {
     --dpad-cell: 31px;
   }
+
+  /* The plus-shape's four diagonal corners (row/col 1-and-3 of the 3x3 grid)
+     belong to no control — .pad-hub only fills the centre cell, so a
+     fingertip landing there currently does nothing. Give each arm an
+     invisible ::before that reclaims its own two neighbouring corners (plus
+     a bit more beyond the cross's outer edge) as real hit area, without
+     touching the side that borders the hub — that side already sits flush
+     with a real button edge and reclaiming it would just overlap .pad-hub.
+     Visually nothing changes: the ::before paints no background of its own.
+     Corner reclaim is kept to 10px per arm (well under the 31px cell) so two
+     arms sharing a corner never fully overlap and race for the same tap. */
+  .pad {
+    position: relative;
+  }
+  .pad::before {
+    content: "";
+    position: absolute;
+  }
+  .pad-up::before {
+    top: -12px;
+    left: -10px;
+    right: -10px;
+    bottom: 0;
+  }
+  .pad-down::before {
+    bottom: -12px;
+    left: -10px;
+    right: -10px;
+    top: 0;
+  }
+  .pad-left::before {
+    left: -12px;
+    top: -10px;
+    bottom: -10px;
+    right: 0;
+  }
+  .pad-right::before {
+    right: -12px;
+    top: -10px;
+    bottom: -10px;
+    left: 0;
+  }
 }
